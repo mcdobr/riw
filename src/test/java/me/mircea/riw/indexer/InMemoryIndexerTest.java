@@ -11,7 +11,7 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 
-public class IndexerTest {
+public class InMemoryIndexerTest {
     File htmlDir;
 
     @Before
@@ -21,14 +21,14 @@ public class IndexerTest {
 
     @Test
     public void shouldIndexAllResourceFiles() throws IOException {
-        Indexer indexer = new Indexer();
+        InMemoryIndexer indexer = new InMemoryIndexer();
         for (File htmlFile : htmlDir.listFiles()) {
             Document doc = Jsoup.parse(htmlFile, null);
             Element canonicalUrlTag = doc.selectFirst("meta[property='og:url']");
 
             if (canonicalUrlTag != null) {
                 String canonicalUrl = canonicalUrlTag.attr("content");
-                indexer.addDocument(new me.mircea.riw.model.Document(doc));
+                indexer.indexDocument(new me.mircea.riw.model.Document(doc));
             }
         }
 

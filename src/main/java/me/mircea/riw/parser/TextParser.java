@@ -4,52 +4,45 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
+import com.google.common.base.Preconditions;
+import me.mircea.riw.model.Document;
 import me.mircea.riw.parser.stem.BasicEnglishLowerCaseStemmer;
 import me.mircea.riw.parser.stem.Stemmer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TextParser {
+public class TextParser implements Parser {
     private static final Logger LOGGER = LoggerFactory.getLogger(TextParser.class);
 
-    private Set<String> exceptionWords;
-    private Set<String> stopWords;
+    private final Set<String> exceptionWords;
+    private final Set<String> stopWords;
+
+    // TODO: add stemming
     private Stemmer stemmer;
 
-    public TextParser(Set<String> exceptionWords, Set<String> stopWords) {
-        this.exceptionWords = exceptionWords;
-        this.stopWords = stopWords;
-        this.stemmer = new BasicEnglishLowerCaseStemmer();
-    }
-
     public TextParser() {
-        this(Collections.emptySet(), Collections.emptySet());
+        this(Locale.ENGLISH);
     }
 
-    public void parseDirectory(String baseDirPath) throws IOException {
-        File baseDir = new File(baseDirPath);
-        if (!baseDir.isDirectory())
-            throw new IllegalArgumentException("Specified file is not a folder");
+    public TextParser(Locale locale) {
+        ResourceBundle rb = ResourceBundle.getBundle("lexicon", locale);
+        this.stopWords = Arrays.stream(rb.getString("stopwords").split(","))
+                .collect(Collectors.toSet());
+        this.exceptionWords = Arrays.stream(rb.getString("exceptionwords").split(","))
+                .collect(Collectors.toSet());
+    }
 
-        Queue<File> fileQueue = new LinkedList<>();
-        fileQueue.add(baseDir);
+    @Override
+    public Document parse(Path path) throws IOException {
+        Preconditions.checkNotNull(path);
+        String text = new String(Files.readAllBytes(path));
 
-        while (!fileQueue.isEmpty()) {
-            File frontFile = fileQueue.poll();
-            if (frontFile.isDirectory()) {
-                fileQueue.addAll(Arrays.asList(frontFile.listFiles()));
-            } else if (frontFile.isFile()) {
-                parseFile(frontFile);
-            }
-        }
+        return new Document(text, path.toString());
     }
 
     public Map<String, Integer> parseFile(File file) throws IOException {

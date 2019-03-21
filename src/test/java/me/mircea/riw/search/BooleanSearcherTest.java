@@ -1,8 +1,7 @@
 package me.mircea.riw.search;
 
-import me.mircea.riw.indexer.Indexer;
+import me.mircea.riw.indexer.InMemoryIndexer;
 import me.mircea.riw.model.Document;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -18,7 +17,7 @@ public class BooleanSearcherTest {
 
     @Before
     public void setUp() {
-        Indexer indexer = new Indexer(doc1, doc2, doc3);
+        InMemoryIndexer indexer = new InMemoryIndexer(doc1, doc2, doc3);
         booleanSearcher = new BooleanSearcher(indexer.getInvertedIndex());
     }
 
