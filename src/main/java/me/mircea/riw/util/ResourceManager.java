@@ -1,6 +1,5 @@
 package me.mircea.riw.util;
 
-import me.mircea.riw.model.DocumentContent;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 

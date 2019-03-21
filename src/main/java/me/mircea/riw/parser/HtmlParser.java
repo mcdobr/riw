@@ -1,19 +1,15 @@
 package me.mircea.riw.parser;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import me.mircea.riw.model.DocumentContent;
-import me.mircea.riw.model.DocumentMetadata;
-import me.mircea.riw.model.DocumentPair;
+import me.mircea.riw.model.Document;
 import me.mircea.riw.util.ResourceManager;
 import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.util.AbstractMap;
+import java.nio.file.Path;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 public class HtmlParser {
     private static final Logger LOGGER = LoggerFactory.getLogger(HtmlParser.class);
@@ -30,39 +26,26 @@ public class HtmlParser {
     }
 
 
-    public DocumentPair parseFile(String path, String url) throws IOException {
+    public Document parseFile(String path, String url) throws IOException {
         File inputFile = new File(path);
         return parseFile(inputFile, url);
     }
 
-    public DocumentPair parseFile(File file, String url) throws IOException {
-        Document doc = Jsoup.parse(file, null, "https://en.wikipedia.org/wiki/MapReduce");
-
-        DocumentContent content = new DocumentContent(doc);
-        DocumentMetadata metadata = new DocumentMetadata(doc);
-
-        return new DocumentPair(content, metadata);
+    public Document parseFile(File file, String url) throws IOException {
+        org.jsoup.nodes.Document htmlDoc = Jsoup.parse(file, null, "https://en.wikipedia.org/wiki/MapReduce");
+        return new Document(htmlDoc);
     }
 
-    public void persistDocumentPair(DocumentPair pair) throws IOException {
-        try (PrintWriter contentWriter = new PrintWriter("content.index");
-             PrintWriter metaWriter = new PrintWriter("meta.index");
+    public void persistDocument(Document doc) throws IOException {
+        try (PrintWriter writer = new PrintWriter(doc.getTitle() + ".index");
         ) {
-            persistContent(pair.getContent(), contentWriter);
-            persistMetadata(pair.getMetadata(), metaWriter);
+            ObjectMapper objectMapper = new ObjectMapper();
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(writer, doc);
+            //doc.setPath();
+
         } catch (FileNotFoundException fnfe) {
             LOGGER.warn("Could not create file {}", fnfe);
         }
-    }
-
-    private void persistContent(DocumentContent content, PrintWriter writer) throws IOException {
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(writer, content);
-    }
-
-    private void persistMetadata(DocumentMetadata metadata, PrintWriter writer) throws IOException {
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(writer, metadata);
     }
 
     public TextParser getTextParser() {

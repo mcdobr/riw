@@ -12,6 +12,8 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
+import me.mircea.riw.parser.stem.BasicEnglishLowerCaseStemmer;
+import me.mircea.riw.parser.stem.Stemmer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,10 +22,12 @@ public class TextParser {
 
     private Set<String> exceptionWords;
     private Set<String> stopWords;
+    private Stemmer stemmer;
 
     public TextParser(Set<String> exceptionWords, Set<String> stopWords) {
         this.exceptionWords = exceptionWords;
         this.stopWords = stopWords;
+        this.stemmer = new BasicEnglishLowerCaseStemmer();
     }
 
     public TextParser() {
@@ -50,10 +54,10 @@ public class TextParser {
 
     public Map<String, Integer> parseFile(File file) throws IOException {
         String text = new String(Files.readAllBytes(Paths.get(file.getPath())), StandardCharsets.UTF_8);
-        return extractWords(text);
+        return extractWordStems(text);
     }
 
-    public Map<String, Integer> extractWords(String text) {
+    public Map<String, Integer> extractWordStems(String text) {
         WordTokenizer tokenizer = new WordTokenizer();
         Map<String, Integer> wordsInDocument = tokenizer.countOccurences(text);
         wordsInDocument.entrySet()

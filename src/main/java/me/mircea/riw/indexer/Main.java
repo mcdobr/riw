@@ -1,6 +1,5 @@
 package me.mircea.riw.indexer;
 
-import me.mircea.riw.parser.HtmlParser;
 import me.mircea.riw.parser.TextParser;
 
 import java.io.BufferedReader;
@@ -11,12 +10,11 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class Main {
-    public static void main(String[] args) throws IOException {
-        HtmlParser parser = new HtmlParser();
-        parser.parseFile("C:\\Users\\mircea\\IdeaProjects\\riw\\MapReduce.txt",
-                "https://en.wikipedia.org/wiki/MapReduce");
+    public static void main(String[] args){
 
-        // Dir parsing
+    }
+
+    private static void runDirParser() throws IOException {
         ClassLoader classloader = Thread.currentThread().getContextClassLoader();
         Set<String> exceptionWords = readWordSet(classloader.getResourceAsStream("english_exceptionwords.txt"));
         Set<String> stopWords = readWordSet(classloader.getResourceAsStream("english_stopwords.txt"));

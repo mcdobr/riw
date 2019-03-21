@@ -1,0 +1,128 @@
+package me.mircea.riw.model;
+
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
+
+import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.Set;
+
+public class Document {
+    private String title;
+    private String keywords;
+    private String description;
+    private String text;
+
+    private String robots;
+    private Set<String> links;
+    private Path path;
+    private String absUrl;
+
+    public Document(String text, String absUrl) {
+        this.text = text;
+        this.absUrl = absUrl;
+    }
+
+    public Document(org.jsoup.nodes.Document htmlDoc) {
+        // Extract content
+        this.title = htmlDoc.title();
+
+        Element keywordsTag = htmlDoc.selectFirst("meta[name='keywords']");
+        if (keywordsTag != null)
+            this.keywords = keywordsTag.attr("content");
+
+        Element descriptionTag = htmlDoc.selectFirst("meta[name='description']");
+        if (descriptionTag != null)
+            this.description = descriptionTag.attr("content");
+
+        this.text = htmlDoc.text();
+
+        Element robotsTag = htmlDoc.selectFirst("meta[name='robots']");
+        if (robotsTag != null)
+            this.robots = robotsTag.attr("content");
+
+        Elements links = htmlDoc.select("a[href]");
+
+        Set<String> seenLinks = new HashSet<>();
+        seenLinks.add(htmlDoc.baseUri());
+
+        for (Element link : links) {
+            String absUrl = link.absUrl("href");
+
+            int indexOfFragment = absUrl.indexOf('#');
+            String resourceUrl;
+            if (indexOfFragment != -1)
+                resourceUrl = absUrl.substring(0, indexOfFragment);
+            else
+                resourceUrl = absUrl;
+
+            seenLinks.add(resourceUrl);
+        }
+
+        this.absUrl = htmlDoc.location();
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getKeywords() {
+        return keywords;
+    }
+
+    public void setKeywords(String keywords) {
+        this.keywords = keywords;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public String getText() {
+        return text;
+    }
+
+    public void setText(String text) {
+        this.text = text;
+    }
+
+    public String getRobots() {
+        return robots;
+    }
+
+    public void setRobots(String robots) {
+        this.robots = robots;
+    }
+
+    public Set<String> getLinks() {
+        return links;
+    }
+
+    public void setLinks(Set<String> links) {
+        this.links = links;
+    }
+
+    public Path getPath() {
+        return path;
+    }
+
+    public void setPath(Path path) {
+        this.path = path;
+    }
+
+    public String getAbsUrl() {
+        return absUrl;
+    }
+
+    public void setAbsUrl(String absUrl) {
+        this.absUrl = absUrl;
+    }
+}

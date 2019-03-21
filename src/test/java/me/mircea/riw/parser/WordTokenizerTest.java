@@ -12,7 +12,7 @@ import me.mircea.riw.parser.WordTokenizer;
 public class WordTokenizerTest {
     @Test
     public void countsOccurencesCorrectly() {
-        String mockStr = "Ana are mere, pere, bere, iarasi mere si bere. Apoi vine guvernu si ia 24%";
+        String mockStr = "Ana are mere, pere, bere, iarasi mere si bere. Apoi vine guvernu si ia 19%";
 
         WordTokenizer tokenizer = new WordTokenizer();
         Map<String, Integer> occurences = tokenizer.countOccurences(mockStr);

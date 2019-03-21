@@ -2,7 +2,6 @@ package me.mircea.riw.indexer;
 
 import static org.junit.Assert.*;
 
-import me.mircea.riw.util.ResourceManager;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -13,12 +12,15 @@ import java.io.File;
 import java.io.IOException;
 
 public class IndexerTest {
+    File htmlDir;
+
+    @Before
+    public void setUp() {
+        htmlDir = new File(getClass().getClassLoader().getResource("htmlFiles").getFile());
+    }
 
     @Test
-    public void shouldIndexCorrectly() throws IOException {
-        File htmlDir = new File(getClass().getClassLoader().getResource("htmlFiles").getFile());
-        assertTrue(htmlDir.isDirectory());
-
+    public void shouldIndexAllResourceFiles() throws IOException {
         Indexer indexer = new Indexer();
         for (File htmlFile : htmlDir.listFiles()) {
             Document doc = Jsoup.parse(htmlFile, null);
@@ -26,14 +28,14 @@ public class IndexerTest {
 
             if (canonicalUrlTag != null) {
                 String canonicalUrl = canonicalUrlTag.attr("content");
-                indexer.indexFile(htmlFile.getAbsolutePath(), canonicalUrl);
+                indexer.addDocument(new me.mircea.riw.model.Document(doc));
             }
         }
 
         assertEquals(2, indexer.getDirectIndex().size());
-        indexer.getDirectIndex().entrySet().forEach(System.out::println);
-        9
 
-        indexer.getInvertedIndex().entrySet().forEach(System.out::println);
+        indexer.persistIndices();
+        //indexer.getDirectIndex().entrySet().forEach(System.out::println);
+        //indexer.getInvertedIndex().entrySet().forEach(System.out::println);
     }
 }
