@@ -1,14 +1,20 @@
 package me.mircea.riw.model;
 
+import me.mircea.riw.parser.TextParser;
+import org.bson.types.ObjectId;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 public class Document {
-    private String title;
+    private ObjectId id;
+
+    private String name;
     private String keywords;
     private String description;
     private String text;
@@ -17,15 +23,21 @@ public class Document {
     private Set<String> links;
     private Path path;
     private String absUrl;
+    private Map<String, Integer> terms;
+
+    public Document() {
+        this.terms = new HashMap<>();
+    }
 
     public Document(String text, String absUrl) {
         this.text = text;
         this.absUrl = absUrl;
+        this.terms = new TextParser().extractWordStems(this.text);
     }
 
     public Document(org.jsoup.nodes.Document htmlDoc) {
         // Extract content
-        this.title = htmlDoc.title();
+        this.name = htmlDoc.title();
 
         Element keywordsTag = htmlDoc.selectFirst("meta[name='keywords']");
         if (keywordsTag != null)
@@ -36,6 +48,7 @@ public class Document {
             this.description = descriptionTag.attr("content");
 
         this.text = htmlDoc.text();
+        this.terms = new TextParser().extractWordStems(this.text);
 
         Element robotsTag = htmlDoc.selectFirst("meta[name='robots']");
         if (robotsTag != null)
@@ -62,12 +75,20 @@ public class Document {
         this.absUrl = htmlDoc.location();
     }
 
-    public String getTitle() {
-        return title;
+    public ObjectId getId() {
+        return id;
     }
 
-    public void setTitle(String title) {
-        this.title = title;
+    public void setId(ObjectId id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 
     public String getKeywords() {
@@ -124,5 +145,13 @@ public class Document {
 
     public void setAbsUrl(String absUrl) {
         this.absUrl = absUrl;
+    }
+
+    public Map<String, Integer> getTerms() {
+        return terms;
+    }
+
+    public void setTerms(Map<String, Integer> terms) {
+        this.terms = terms;
     }
 }

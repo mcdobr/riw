@@ -38,7 +38,7 @@ public class HtmlParser implements Parser {
     }
 
     public void persistDocument(Document doc) throws IOException {
-        try (PrintWriter writer = new PrintWriter(doc.getTitle() + ".index");
+        try (PrintWriter writer = new PrintWriter(doc.getName() + ".index");
         ) {
             ObjectMapper objectMapper = new ObjectMapper();
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(writer, doc);

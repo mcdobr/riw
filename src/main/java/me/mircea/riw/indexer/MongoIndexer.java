@@ -43,6 +43,8 @@ public class MongoIndexer implements Runnable, Indexer {
         Preconditions.checkNotNull(doc);
 
 
+
+
         throw new UnsupportedOperationException("Not implemented yet");
     }
 }

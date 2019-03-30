@@ -17,6 +17,6 @@ public class HtmlParserTest {
         Document doc = parser.parseFile("C:\\Users\\mircea\\IdeaProjects\\riw\\MapReduce.txt",
                 "https://en.wikipedia.org/wiki/MapReduce");
 
-        assertTrue(doc.getTitle().toLowerCase().contains("mapreduce"));
+        assertTrue(doc.getName().toLowerCase().contains("mapreduce"));
     }
 }
