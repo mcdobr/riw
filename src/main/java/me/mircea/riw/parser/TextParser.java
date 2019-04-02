@@ -11,8 +11,6 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import me.mircea.riw.model.Document;
-import me.mircea.riw.parser.stem.BasicEnglishLowerCaseStemmer;
-import me.mircea.riw.parser.stem.Stemmer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,9 +19,7 @@ public class TextParser implements Parser {
 
     private final Set<String> exceptionWords;
     private final Set<String> stopWords;
-
-    // TODO: add stemming
-    private Stemmer stemmer;
+    private final WordTokenizer tokenizer;
 
     public TextParser() {
         this(Locale.ENGLISH);
@@ -35,6 +31,7 @@ public class TextParser implements Parser {
                 .collect(Collectors.toSet());
         this.exceptionWords = Arrays.stream(rb.getString("exceptionwords").split(","))
                 .collect(Collectors.toSet());
+        this.tokenizer = new WordTokenizer();
     }
 
     @Override
@@ -51,7 +48,6 @@ public class TextParser implements Parser {
     }
 
     public Map<String, Integer> extractWordStems(String text) {
-        WordTokenizer tokenizer = new WordTokenizer();
         Map<String, Integer> wordsInDocument = tokenizer.countOccurences(text);
         wordsInDocument.entrySet()
                 .removeIf(entry -> !exceptionWords.contains(entry.getKey()) && stopWords.contains(entry.getKey()));
