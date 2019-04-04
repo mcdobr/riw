@@ -2,38 +2,35 @@ package me.mircea.riw.indexer;
 
 import com.google.common.base.Preconditions;
 import com.mongodb.client.MongoDatabase;
-import me.mircea.riw.db.DatabaseManager;
 import me.mircea.riw.model.Document;
 import me.mircea.riw.parser.TextParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.LinkedBlockingQueue;
 
-public class MongoIndexer implements Runnable, Indexer {
+public class MongoIndexer implements Indexer {
     private static final Logger LOGGER = LoggerFactory.getLogger(MongoIndexer.class);
+    private static final Document POISON_PILL = new Document();
 
     private final BlockingQueue<Document> documentQueue;
     private final MongoDatabase database;
 
-    private MongoIndexer(BlockingQueue<Document> documentQueue, MongoDatabase database) {
-        Preconditions.checkNotNull(documentQueue);
+    public MongoIndexer(MongoDatabase database) {
         Preconditions.checkNotNull(database);
-        this.documentQueue = documentQueue;
         this.database = database;
+        this.documentQueue = new LinkedBlockingQueue<>();
     }
-
-
-
 
     @Override
     public void run() {
         try {
             while (true) {
-                Document doc;
-                if ((doc = documentQueue.poll(1, TimeUnit.SECONDS)) == null)
+                Document doc = documentQueue.take();
+                if (doc == POISON_PILL)
                     break;
 
                 indexDocument(doc);
