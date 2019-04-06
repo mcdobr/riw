@@ -3,21 +3,26 @@ package me.mircea.riw.model;
 import com.google.common.base.Preconditions;
 import org.bson.types.ObjectId;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class Term {
     private ObjectId id;
     private String name;
-    private Map<ObjectId, Integer> documentFrequency;
+    private List<TermLink> documentFrequency;
 
     public Term() {
-        this.documentFrequency = new HashMap<>();
+        this.id = new ObjectId();
+        this.documentFrequency = new ArrayList<>();
     }
 
     public Term(String name) {
         Preconditions.checkNotNull(name);
+        this.id = new ObjectId();
         this.name = name;
+        this.documentFrequency = new ArrayList<>();
     }
 
     public ObjectId getId() {
@@ -36,11 +41,11 @@ public class Term {
         this.name = name;
     }
 
-    public Map<ObjectId, Integer> getDocumentFrequency() {
+    public List<TermLink> getDocumentFrequency() {
         return documentFrequency;
     }
 
-    public void setDocumentFrequency(Map<ObjectId, Integer> documentFrequency) {
+    public void setDocumentFrequency(List<TermLink> documentFrequency) {
         this.documentFrequency = documentFrequency;
     }
 }

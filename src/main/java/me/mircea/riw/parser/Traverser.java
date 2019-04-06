@@ -1,7 +1,7 @@
 package me.mircea.riw.parser;
 
 import com.google.common.base.Preconditions;
-import me.mircea.riw.indexer.Indexer;
+import me.mircea.riw.indexer.AsyncQueueableIndexer;
 import me.mircea.riw.model.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,19 +13,16 @@ import java.nio.file.Path;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 
 public class Traverser {
     private static final Logger LOGGER = LoggerFactory.getLogger(Traverser.class);
 
-    private final List<Indexer> workers;
+    private final List<AsyncQueueableIndexer> workers;
     private final Parser parser;
     private final Queue<Path> pathQueue;
 
 
-    public Traverser(Path seed, List<Indexer> workers, Parser parser) {
+    public Traverser(Path seed, List<AsyncQueueableIndexer> workers, Parser parser) {
         Preconditions.checkNotNull(seed);
         Preconditions.checkNotNull(workers);
         Preconditions.checkNotNull(parser);
@@ -45,15 +42,10 @@ public class Traverser {
                     dirContents.forEach(pathQueue::add);
                 }
             } else if (Files.isRegularFile(path)) {
-                workers.get(targetedWorker).addDocument
-                documentQueue.add(parser.parse(path));
-
+                Document doc = parser.parse(path);
+                workers.get(targetedWorker).indexDocument(doc);
                 targetedWorker = (targetedWorker + 1) % workers.size();
             }
-        }
-
-        for (Indexer worker : workers) {
-            worker.end();
         }
     }
 }

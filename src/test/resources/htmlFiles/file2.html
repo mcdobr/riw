@@ -742,7 +742,7 @@
                                             <div class="comment-text js-comment-text-and-form">
                                                 <div class="comment-body js-comment-edit-hide">
 
-                                                    <span class="comment-copy">Note that the first problem you&#39;re going to have is loading the file at all - in general, browser security settings will not let you load a local file with AJAX, even from a local HTML page. You can get around this by loading it as a script, either with JSONP or in the document <code>&lt;head&gt;</code>.</span>
+                                                    <span class="comment-copy">Note that the first problem you&#39;re going to have is loading the file at all - in general, browser security settings will not let you load a local file with AJAX, even from a local HTML page. You can get around this by loading it as a script, either with JSONP or in the documentId <code>&lt;head&gt;</code>.</span>
 
                                                     &ndash;&nbsp;<a href="/users/380487/nrabinowitz"
                                                                     name="48,299 reputation"
@@ -1313,7 +1313,7 @@
                     try {
                         (function (a) {
                             function b(a) {
-                                return 'string' == typeof a ? document.getElementById(a) : a
+                                return 'string' == typeof a ? documentId.getElementById(a) : a
                             }
 
                             function c(a) {
@@ -1345,8 +1345,8 @@
                             }
 
                             function i(a) {
-                                var b = document.createElement('script');
-                                b.src = a, document.body.appendChild(b)
+                                var b = documentId.createElement('script');
+                                b.src = a, documentId.body.appendChild(b)
                             }
 
                             function j(a) {
@@ -1376,8 +1376,8 @@
                             }
 
                             function o() {
-                                var a = document.createElement('div');
-                                a.className = 'adsbox', a.id = 'clc-abd', a.style.position = 'absolute', a.style.pointerEvents = 'none', a.innerHTML = '&nbsp;', document.body.appendChild(a)
+                                var a = documentId.createElement('div');
+                                a.className = 'adsbox', a.id = 'clc-abd', a.style.position = 'absolute', a.style.pointerEvents = 'none', a.innerHTML = '&nbsp;', documentId.body.appendChild(a)
                             }
 
                             function p(a) {
@@ -1385,11 +1385,11 @@
                                 try {
                                     var e = c.getSlotElementId(), f = [];
                                     e || f.push('id=0');
-                                    var h = document.getElementById(e);
+                                    var h = documentId.getElementById(e);
                                     if (!e || h ? h.hasAttribute('data-clc-stalled') && f.push('st=1') : f.push('el=0'), 0 !== f.length) return void B(f.join('&'));
                                     -1 === x.dh.indexOf(d) ? h.setAttribute('data-clc-prefilled', 'true') : g(h), h.setAttribute('data-clc-ready', 'true')
                                 } catch (a) {
-                                    var i = document.querySelector('#dfp-tsb, #dfp-isb, #clc-tsb');
+                                    var i = documentId.querySelector('#dfp-tsb, #dfp-isb, #clc-tsb');
                                     i && i.setAttribute('data-clc-ready', 'true'), B('e=1')
                                 }
                             }
@@ -2396,7 +2396,7 @@
         a.async = 1;
         a.src = g;
         m.parentNode.insertBefore(a, m);
-    })(window, document, 'script', 'https://www.google-analytics.com/analytics.js', 'ga');
+    })(window, documentId, 'script', 'https://www.google-analytics.com/analytics.js', 'ga');
 
     StackExchange.ready(function () {
 
@@ -2422,15 +2422,15 @@
     var _qevents = _qevents || [],
         _comscore = _comscore || [];
     (function () {
-        var ssl = 'https:' == document.location.protocol,
-            s = document.getElementsByTagName('script')[0],
-            qc = document.createElement('script');
+        var ssl = 'https:' == documentId.location.protocol,
+            s = documentId.getElementsByTagName('script')[0],
+            qc = documentId.createElement('script');
         qc.async = true;
         qc.src = (ssl ? 'https://secure' : 'http://edge') + '.quantserve.com/quant.js';
         s.parentNode.insertBefore(qc, s);
         _qevents.push({qacct: "p-c1rF4kxgLUzNc"});
         /**/
-        var sc = document.createElement('script');
+        var sc = documentId.createElement('script');
         sc.async = true;
         sc.src = (ssl ? 'https://sb' : 'http://b') + '.scorecardresearch.com/beacon.js';
         s.parentNode.insertBefore(sc, s);

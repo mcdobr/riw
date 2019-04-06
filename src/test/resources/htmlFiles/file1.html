@@ -1072,7 +1072,7 @@ DoubleDoublePair
                                             better support in the JVM (and eventually the Java language) for <em>value
                                                 types</em>. See this <a
                                                     href="http://cr.openjdk.java.net/~jrose/values/values-0.html"
-                                                    rel="noreferrer">State of the Values</a> document. This is
+                                                    rel="noreferrer">State of the Values</a> documentId. This is
                                             preliminary, speculative work, and it covers only issues from the JVM
                                             perspective, but it already has a fair amount of thought behind it. Of
                                             course there are no guarantees that this will get into Java 9, or ever get
@@ -2882,7 +2882,7 @@ String value = entry._2;
                     try {
                         (function (a) {
                             function b(a) {
-                                return 'string' == typeof a ? document.getElementById(a) : a
+                                return 'string' == typeof a ? documentId.getElementById(a) : a
                             }
 
                             function c(a) {
@@ -2914,8 +2914,8 @@ String value = entry._2;
                             }
 
                             function i(a) {
-                                var b = document.createElement('script');
-                                b.src = a, document.body.appendChild(b)
+                                var b = documentId.createElement('script');
+                                b.src = a, documentId.body.appendChild(b)
                             }
 
                             function j(a) {
@@ -2945,8 +2945,8 @@ String value = entry._2;
                             }
 
                             function o() {
-                                var a = document.createElement('div');
-                                a.className = 'adsbox', a.id = 'clc-abd', a.style.position = 'absolute', a.style.pointerEvents = 'none', a.innerHTML = '&nbsp;', document.body.appendChild(a)
+                                var a = documentId.createElement('div');
+                                a.className = 'adsbox', a.id = 'clc-abd', a.style.position = 'absolute', a.style.pointerEvents = 'none', a.innerHTML = '&nbsp;', documentId.body.appendChild(a)
                             }
 
                             function p(a) {
@@ -2954,11 +2954,11 @@ String value = entry._2;
                                 try {
                                     var e = c.getSlotElementId(), f = [];
                                     e || f.push('id=0');
-                                    var h = document.getElementById(e);
+                                    var h = documentId.getElementById(e);
                                     if (!e || h ? h.hasAttribute('data-clc-stalled') && f.push('st=1') : f.push('el=0'), 0 !== f.length) return void B(f.join('&'));
                                     -1 === x.dh.indexOf(d) ? h.setAttribute('data-clc-prefilled', 'true') : g(h), h.setAttribute('data-clc-ready', 'true')
                                 } catch (a) {
-                                    var i = document.querySelector('#dfp-tsb, #dfp-isb, #clc-tsb');
+                                    var i = documentId.querySelector('#dfp-tsb, #dfp-isb, #clc-tsb');
                                     i && i.setAttribute('data-clc-ready', 'true'), B('e=1')
                                 }
                             }
@@ -4027,7 +4027,7 @@ String value = entry._2;
         a.async = 1;
         a.src = g;
         m.parentNode.insertBefore(a, m);
-    })(window, document, 'script', 'https://www.google-analytics.com/analytics.js', 'ga');
+    })(window, documentId, 'script', 'https://www.google-analytics.com/analytics.js', 'ga');
 
     StackExchange.ready(function () {
 
@@ -4053,15 +4053,15 @@ String value = entry._2;
     var _qevents = _qevents || [],
         _comscore = _comscore || [];
     (function () {
-        var ssl = 'https:' == document.location.protocol,
-            s = document.getElementsByTagName('script')[0],
-            qc = document.createElement('script');
+        var ssl = 'https:' == documentId.location.protocol,
+            s = documentId.getElementsByTagName('script')[0],
+            qc = documentId.createElement('script');
         qc.async = true;
         qc.src = (ssl ? 'https://secure' : 'http://edge') + '.quantserve.com/quant.js';
         s.parentNode.insertBefore(qc, s);
         _qevents.push({qacct: "p-c1rF4kxgLUzNc"});
         /**/
-        var sc = document.createElement('script');
+        var sc = documentId.createElement('script');
         sc.async = true;
         sc.src = (ssl ? 'https://sb' : 'http://b') + '.scorecardresearch.com/beacon.js';
         s.parentNode.insertBefore(sc, s);

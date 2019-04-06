@@ -54,7 +54,8 @@ public class WordTokenizer {
 			stemmer.stem();
 			String stem = stemmer.getCurrent();
 
-			occurences.merge(stem, 1, Integer::sum);
+			if (stem != null && !stem.isEmpty())
+				occurences.merge(stem, 1, Integer::sum);
 		}
 	}
 }

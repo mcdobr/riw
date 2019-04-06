@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class Document {
     private ObjectId id;
@@ -26,10 +27,12 @@ public class Document {
     private Map<String, Integer> terms;
 
     public Document() {
+        //this.id = new ObjectId();
         this.terms = new HashMap<>();
     }
 
     public Document(String text, String absUrl) {
+        //this.id = new ObjectId();
         this.text = text;
         this.absUrl = absUrl;
         this.terms = new TextParser().extractWordStems(this.text);
@@ -73,6 +76,10 @@ public class Document {
         }
 
         this.absUrl = htmlDoc.location();
+    }
+
+    public long size() {
+        return terms.values().stream().collect(Collectors.summingLong(Integer::longValue));
     }
 
     public ObjectId getId() {

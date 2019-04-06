@@ -2,24 +2,32 @@ package me.mircea.riw.db;
 
 import com.mongodb.BasicDBObject;
 import com.mongodb.MongoClientSettings;
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoClients;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.*;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.result.UpdateResult;
 import me.mircea.riw.model.Document;
 import me.mircea.riw.model.Term;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
-import java.util.function.Consumer;
+import java.util.*;
+import java.util.stream.Collectors;
 
+import static com.mongodb.client.model.Filters.*;
+import static com.mongodb.client.model.Updates.*;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
+
 public class DatabaseManager {
-    public static final DatabaseManager instance = new DatabaseManager();
+    private static final DatabaseManager instance = new DatabaseManager();
+
+    public static DatabaseManager getInstance() {
+        return instance;
+    }
 
     private final MongoClient mongoClient;
     private final MongoDatabase database;
@@ -48,12 +56,60 @@ public class DatabaseManager {
         return database;
     }
 
-    public void insertDocument(Document doc) {
-        this.documents.insertOne(doc);
+    public void upsertDocument(Document doc) {
+        Bson sameDocumentFilter = or(
+                eq("_id", doc.getId()),
+                eq("absUrl", doc.getAbsUrl())
+        );
+
+        Bson updateOperation = combine(
+                set("name", doc.getName()),
+                set("keywords", doc.getKeywords()),
+                set("description", doc.getDescription()),
+
+                set("robots", doc.getRobots()),
+                set("links", doc.getLinks()),
+                set("absUrl", doc.getAbsUrl()),
+                set("terms", doc.getTerms())
+        );
+        UpdateOptions options = new UpdateOptions().upsert(true);
+        UpdateResult result = this.documents.updateOne(sameDocumentFilter, updateOperation, options);
+
+        if (result.getUpsertedId() != null)
+            doc.setId(result.getUpsertedId().asObjectId().getValue());
     }
 
-    public void getDocument(ObjectId id)
+    public Document getDocument(ObjectId id) {
+        return this.documents.find(eq("_id", id)).first();
+    }
+
+    public void upsertTerm(Term term) {
+        Bson sameTermFilter = or(
+                eq("_id", term.getId()),
+                eq("name", term.getName())
+        );
+
+        FindIterable<Term> terms = this.terms.find(sameTermFilter);
+        for (Term temp : terms) {
+            term.getDocumentFrequency().addAll(temp.getDocumentFrequency());
+        }
+
+        this.terms.deleteMany(sameTermFilter);
+        this.terms.insertOne(term);
+    }
+
+    public void clean() {
+        documents.drop();
+        terms.drop();
+    }
+
+    public Iterable<Term> getRelevantTerms(Set<String> queryTerms) {
+        final List<Bson> termFilter = queryTerms.stream().map(stem -> eq("name", stem)).collect(Collectors.toList());
+        return this.terms.find(or(termFilter));
+    }
+
+    public long getNumberOfDocuments()
     {
-        this.documents.find(new BasicDBObject("_id", id)).forEach((Consumer<Document>) it -> System.out.println(it.getTerms()));
+        return this.documents.countDocuments();
     }
 }

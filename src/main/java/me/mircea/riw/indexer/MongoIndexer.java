@@ -2,26 +2,26 @@ package me.mircea.riw.indexer;
 
 import com.google.common.base.Preconditions;
 import com.mongodb.client.MongoDatabase;
+import me.mircea.riw.db.DatabaseManager;
 import me.mircea.riw.model.Document;
-import me.mircea.riw.parser.TextParser;
+import me.mircea.riw.model.Term;
+import me.mircea.riw.model.TermLink;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-public class MongoIndexer implements Indexer {
+public class MongoIndexer implements AsyncQueueableIndexer {
     private static final Logger LOGGER = LoggerFactory.getLogger(MongoIndexer.class);
     private static final Document POISON_PILL = new Document();
 
     private final BlockingQueue<Document> documentQueue;
-    private final MongoDatabase database;
+    private final DatabaseManager dbManager;
 
-    public MongoIndexer(MongoDatabase database) {
-        Preconditions.checkNotNull(database);
-        this.database = database;
+    public MongoIndexer() {
+        this.dbManager = DatabaseManager.getInstance();
         this.documentQueue = new LinkedBlockingQueue<>();
     }
 
@@ -40,26 +40,35 @@ public class MongoIndexer implements Indexer {
             Thread.currentThread().interrupt();
         }
     }
-
     @Override
     public void indexDocument(Document doc) {
+        indexDirect(doc);
+        indexInverted(doc);
+    }
+
+    private void indexDirect(Document doc) {
+        dbManager.upsertDocument(doc);
+    }
+
+    private void indexInverted(Document doc) {
+        doc.getTerms().entrySet()
+                .stream()
+                .forEach(entry -> {
+                    Term term = new Term(entry.getKey());
+                    term.getDocumentFrequency().add(new TermLink(doc, entry.getValue()));
+
+                    dbManager.upsertTerm(term);
+                });
+    }
+
+    @Override
+    public void scheduleDocument(Document doc) {
         Preconditions.checkNotNull(doc);
-
-
-        TextParser parser = new TextParser();
-        Map<String, Integer> stemOccurences = parser.extractWordStems(doc.getText());
-
-        indexDirect(stemOccurences);
-        indexInverted();
-
+        documentQueue.add(doc);
     }
 
-    private void indexDirect(Map<String, Integer> stemOccurences) {
-        //MongoIndexer.in
-        throw new UnsupportedOperationException("Not implemented yet");
-    }
-
-    private void indexInverted() {
-        throw new UnsupportedOperationException("Not implemented yet");
+    @Override
+    public void stop() {
+        scheduleDocument(POISON_PILL);
     }
 }
