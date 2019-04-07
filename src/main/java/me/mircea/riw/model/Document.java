@@ -6,6 +6,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -80,6 +81,15 @@ public class Document {
 
     public long size() {
         return terms.values().stream().collect(Collectors.summingLong(Integer::longValue));
+    }
+
+    @Override
+    public String toString() {
+        return "Document{" +
+                "id=" + id +
+                ", absUrl='" + absUrl + '\'' +
+                ", terms=" + terms +
+                '}';
     }
 
     public ObjectId getId() {

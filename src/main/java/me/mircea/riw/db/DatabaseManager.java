@@ -1,6 +1,5 @@
 package me.mircea.riw.db;
 
-import com.mongodb.BasicDBObject;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Indexes;
@@ -83,6 +82,14 @@ public class DatabaseManager {
         return this.documents.find(eq("_id", id)).first();
     }
 
+    public Iterable<Document> getDocuments(Set<ObjectId> relevantDocumentIds) {
+        List<Bson> idEqFilter = relevantDocumentIds.stream()
+                .map(doc -> eq("_id", doc))
+                .collect(Collectors.toList());
+
+        return this.documents.find(or(idEqFilter));
+    }
+
     public void upsertTerm(Term term) {
         Bson sameTermFilter = or(
                 eq("_id", term.getId()),
@@ -103,7 +110,7 @@ public class DatabaseManager {
         terms.drop();
     }
 
-    public Iterable<Term> getRelevantTerms(Set<String> queryTerms) {
+    public Iterable<Term> getRelevantTerms(Collection<String> queryTerms) {
         final List<Bson> termFilter = queryTerms.stream().map(stem -> eq("name", stem)).collect(Collectors.toList());
         return this.terms.find(or(termFilter));
     }
@@ -112,4 +119,5 @@ public class DatabaseManager {
     {
         return this.documents.countDocuments();
     }
+
 }

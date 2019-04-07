@@ -3,8 +3,10 @@ package me.mircea.riw;
 import me.mircea.riw.db.DatabaseManager;
 import me.mircea.riw.indexer.AsyncQueueableIndexer;
 import me.mircea.riw.indexer.MongoIndexer;
+import me.mircea.riw.model.Document;
 import me.mircea.riw.parser.TextParser;
 import me.mircea.riw.parser.Traverser;
+import me.mircea.riw.search.QuantitativeSearcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,10 +17,10 @@ import java.util.List;
 import java.util.concurrent.*;
 
 public class Main {
-    static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
-    static final ExecutorService WORKER_EXECUTOR = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-    static final List<AsyncQueueableIndexer> WORKERS = new ArrayList<>();
-    static final DatabaseManager dbManager = DatabaseManager.getInstance();
+    private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
+    private static final ExecutorService WORKER_EXECUTOR = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+    private static final List<AsyncQueueableIndexer> WORKERS = new ArrayList<>();
+    private static final DatabaseManager DATABASE_MANAGER = DatabaseManager.getInstance();
 
 
     static {
@@ -42,9 +44,12 @@ public class Main {
                     traverser.traverse();
                     break;
                 case "clean":
-                    dbManager.clean();
+                    DATABASE_MANAGER.clean();
                     break;
                 case "search":
+                    QuantitativeSearcher searcher = new QuantitativeSearcher();
+                    System.out.println(args[1]);
+                    searcher.search(args[1]).forEach(kvp -> System.out.printf("%s: %f%n", kvp.getKey(), kvp.getValue()));
                     break;
                 case "help":
                 default:
@@ -62,7 +67,7 @@ public class Main {
         System.out.println(
                 String.join("\n",
                         "sengine index <<path>> to index a folder",
-                        "sengine search <<query>> to search in the current index",
+                        "sengine search \"<<query>>\" to search in the current index",
                         "sengine help to display the help"));
     }
 
