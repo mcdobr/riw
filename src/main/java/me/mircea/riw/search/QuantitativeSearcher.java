@@ -76,21 +76,27 @@ public class QuantitativeSearcher {
     private Set<Term> lookupRelevantTerms(Document query) {
         Preconditions.checkNotNull(query);
         Set<String> stems = query.getTerms().keySet();
-        return Sets.newHashSet(dbManager.getRelevantTerms(stems));
+        if (stems.isEmpty())
+            return Collections.emptySet();
+        else
+            return Sets.newHashSet(dbManager.getRelevantTerms(stems));
     }
 
     private Set<Document> lookupRelevantDocuments(Collection<Term> terms) {
         Preconditions.checkNotNull(terms);
-
-        Set<ObjectId> relevantDocumentIds = new HashSet<>();
-        for (Term term : terms) {
-            List<ObjectId> docIds = term.getDocumentFrequency()
-                    .stream()
-                    .map(TermLink::getDocumentId)
-                    .collect(Collectors.toList());
-            relevantDocumentIds.addAll(docIds);
+        if (terms.isEmpty()) {
+            return Collections.emptySet();
+        } else {
+            Set<ObjectId> relevantDocumentIds = new HashSet<>();
+            for (Term term : terms) {
+                List<ObjectId> docIds = term.getDocumentFrequency()
+                        .stream()
+                        .map(TermLink::getDocumentId)
+                        .collect(Collectors.toList());
+                relevantDocumentIds.addAll(docIds);
+            }
+            return Sets.newHashSet(dbManager.getDocuments(relevantDocumentIds));
         }
-        return Sets.newHashSet(dbManager.getDocuments(relevantDocumentIds));
     }
 
     private double tfidf(Document doc, Term term) {

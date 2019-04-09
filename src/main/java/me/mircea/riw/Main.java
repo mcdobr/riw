@@ -10,11 +10,13 @@ import me.mircea.riw.search.QuantitativeSearcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.print.Doc;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
+import static java.util.AbstractMap.*;
 
 public class Main {
     private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
@@ -49,7 +51,10 @@ public class Main {
                 case "search":
                     QuantitativeSearcher searcher = new QuantitativeSearcher();
                     System.out.println(args[1]);
-                    searcher.search(args[1]).forEach(kvp -> System.out.printf("%s: %f%n", kvp.getKey(), kvp.getValue()));
+                    List<SimpleImmutableEntry<Document, Double>> searchResults = searcher.search(args[1]);
+
+                    System.out.printf("%d documents found %n", searchResults.size());
+                    searchResults.forEach(kvp -> System.out.printf("%s: %f%n", kvp.getKey(), kvp.getValue()));
                     break;
                 case "help":
                 default:
