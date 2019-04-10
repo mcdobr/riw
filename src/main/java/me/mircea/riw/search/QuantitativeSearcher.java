@@ -1,6 +1,7 @@
 package me.mircea.riw.search;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import me.mircea.riw.db.DatabaseManager;
 import me.mircea.riw.model.Document;
@@ -32,8 +33,9 @@ public class QuantitativeSearcher {
     public List<SimpleImmutableEntry<Document, Double>> search(Document query) {
         Preconditions.checkNotNull(query);
 
-        Set<Term> relevantTerms = lookupRelevantTerms(query);
-        Set<Document> relevantDocuments = lookupRelevantDocuments(relevantTerms);
+        List<Term> queryTerms = lookupQueryTerms(query);
+        List<Document> relevantDocuments = lookupRelevantDocuments(queryTerms);
+        List<Term> relevantTerms = lookupRelevantTerms(relevantDocuments);
 
         List<Double> queryVector = createVector(query, relevantTerms);
         Map<Document, List<Double>> relevantDocumentVectors = createDocumentVectors(relevantTerms, relevantDocuments);
@@ -50,7 +52,7 @@ public class QuantitativeSearcher {
         return documentRelevancePairs;
     }
 
-    private Map<Document, List<Double>> createDocumentVectors(Set<Term> relevantTerms, Set<Document> relevantDocuments) {
+    private Map<Document, List<Double>> createDocumentVectors(List<Term> relevantTerms, List<Document> relevantDocuments) {
         Preconditions.checkNotNull(relevantTerms);
         Preconditions.checkNotNull(relevantDocuments);
 
@@ -72,24 +74,22 @@ public class QuantitativeSearcher {
             vector.add(tfidf(doc, term));
         }
 
-        // TODO: use all terms in relevant documents + query
-
         return vector;
     }
 
-    private Set<Term> lookupRelevantTerms(Document query) {
+    private List<Term> lookupQueryTerms(Document query) {
         Preconditions.checkNotNull(query);
         Set<String> stems = query.getTerms().keySet();
         if (stems.isEmpty())
-            return Collections.emptySet();
+            return Collections.emptyList();
         else
-            return Sets.newHashSet(dbManager.getRelevantTerms(stems));
+            return Lists.newArrayList(dbManager.getTerms(stems));
     }
 
-    private Set<Document> lookupRelevantDocuments(Collection<Term> terms) {
+    private List<Document> lookupRelevantDocuments(Collection<Term> terms) {
         Preconditions.checkNotNull(terms);
         if (terms.isEmpty()) {
-            return Collections.emptySet();
+            return Collections.emptyList();
         } else {
             Set<ObjectId> relevantDocumentIds = new HashSet<>();
             for (Term term : terms) {
@@ -99,7 +99,24 @@ public class QuantitativeSearcher {
                         .collect(Collectors.toList());
                 relevantDocumentIds.addAll(docIds);
             }
-            return Sets.newHashSet(dbManager.getDocuments(relevantDocumentIds));
+            return Lists.newArrayList(dbManager.getDocuments(relevantDocumentIds));
+        }
+    }
+
+    private List<Term> lookupRelevantTerms(Collection<Document> documents) {
+        Preconditions.checkNotNull(documents);
+        if (documents.isEmpty()) {
+            return Collections.emptyList();
+        } else {
+            Set<String> termStrings = new HashSet<>();
+            for (Document doc : documents) {
+                termStrings.addAll(doc.getTerms().keySet());
+            }
+
+            if (termStrings.isEmpty())
+                return Collections.emptyList();
+            else
+                return Lists.newArrayList(dbManager.getTerms(termStrings));
         }
     }
 
@@ -112,4 +129,5 @@ public class QuantitativeSearcher {
 
         return tf * idf;
     }
+
 }

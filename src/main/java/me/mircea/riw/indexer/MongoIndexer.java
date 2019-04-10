@@ -6,43 +6,58 @@ import me.mircea.riw.db.DatabaseManager;
 import me.mircea.riw.model.Document;
 import me.mircea.riw.model.Term;
 import me.mircea.riw.model.TermLink;
+import me.mircea.riw.parser.TextParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class MongoIndexer implements AsyncQueueableIndexer {
     private static final Logger LOGGER = LoggerFactory.getLogger(MongoIndexer.class);
-    private static final Document POISON_PILL = new Document();
+    private static final Path POISON_PILL = Paths.get("poison_pill");
 
-    private final BlockingQueue<Document> documentQueue;
+    private final BlockingQueue<Path> documentQueue;
+    private final TextParser parser;
     private final DatabaseManager dbManager;
 
-    public MongoIndexer(DatabaseManager dbManager) {
+    public MongoIndexer(DatabaseManager dbManager, TextParser parser) {
         Preconditions.checkNotNull(dbManager);
+        Preconditions.checkNotNull(parser);
         this.dbManager = dbManager;
+        this.parser = parser;
         this.documentQueue = new LinkedBlockingQueue<>();
     }
 
     @Override
-    public void run() {
+    public Boolean call() {
         try {
             while (true) {
-                Document doc = documentQueue.take();
-                if (doc == POISON_PILL)
+                Path path = documentQueue.take();
+                if (path == POISON_PILL)
                     break;
 
-                indexDocument(doc);
+                try {
+                    Document doc = parser.parse(path);
+                    indexDocument(doc);
+                } catch (IOException ie) {
+                    LOGGER.warn("Could not read path {}", ie);
+                }
             }
         } catch (InterruptedException ie) {
             LOGGER.warn("Indexer thread was interrupted: {}", ie);
             Thread.currentThread().interrupt();
         }
+        return true;
     }
+
     @Override
     public void indexDocument(Document doc) {
+        LOGGER.info("Indexing document {}", doc.getAbsUrl());
         indexDirect(doc);
         indexInverted(doc);
     }
@@ -63,9 +78,9 @@ public class MongoIndexer implements AsyncQueueableIndexer {
     }
 
     @Override
-    public void scheduleDocument(Document doc) {
-        Preconditions.checkNotNull(doc);
-        documentQueue.add(doc);
+    public void scheduleDocument(Path path) {
+        Preconditions.checkNotNull(path);
+        documentQueue.add(path);
     }
 
     @Override

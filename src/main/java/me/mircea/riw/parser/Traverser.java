@@ -18,16 +18,13 @@ public class Traverser {
     private static final Logger LOGGER = LoggerFactory.getLogger(Traverser.class);
 
     private final List<AsyncQueueableIndexer> workers;
-    private final Parser parser;
     private final Queue<Path> pathQueue;
 
 
-    public Traverser(Path seed, List<AsyncQueueableIndexer> workers, Parser parser) {
+    public Traverser(Path seed, List<AsyncQueueableIndexer> workers) {
         Preconditions.checkNotNull(seed);
         Preconditions.checkNotNull(workers);
-        Preconditions.checkNotNull(parser);
         this.workers = workers;
-        this.parser = parser;
         this.pathQueue = new LinkedList<>();
         this.pathQueue.add(seed);
     }
@@ -42,8 +39,7 @@ public class Traverser {
                     dirContents.forEach(pathQueue::add);
                 }
             } else if (Files.isRegularFile(path)) {
-                Document doc = parser.parse(path);
-                workers.get(targetedWorker).indexDocument(doc);
+                workers.get(targetedWorker).scheduleDocument(path);
                 targetedWorker = (targetedWorker + 1) % workers.size();
             }
         }

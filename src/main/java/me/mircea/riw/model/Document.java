@@ -88,7 +88,7 @@ public class Document {
         return "Document{" +
                 "id=" + id +
                 ", absUrl='" + absUrl + '\'' +
-                ", terms=" + terms +
+                // ", terms=" + terms +
                 '}';
     }
 

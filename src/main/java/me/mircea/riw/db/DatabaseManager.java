@@ -5,19 +5,12 @@ import com.mongodb.client.*;
 import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.result.UpdateResult;
-import jdk.internal.util.Preconditions;
 import me.mircea.riw.model.Document;
 import me.mircea.riw.model.Term;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.xml.crypto.Data;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -111,7 +104,7 @@ public class DatabaseManager {
         terms.drop();
     }
 
-    public Iterable<Term> getRelevantTerms(Collection<String> queryTerms) {
+    public Iterable<Term> getTerms(Collection<String> queryTerms) {
         final List<Bson> termFilter = queryTerms.stream().map(stem -> eq("name", stem)).collect(Collectors.toList());
         return this.terms.find(or(termFilter));
     }

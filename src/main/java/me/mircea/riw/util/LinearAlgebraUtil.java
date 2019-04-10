@@ -8,7 +8,6 @@ public class LinearAlgebraUtil {
     public static double cosine(List<Double> u, List<Double> v) {
         Preconditions.checkNotNull(u);
         Preconditions.checkNotNull(v);
-        Preconditions.checkArgument(u.size() == v.size(), "Vectors are not the same length");
 
         return dotProduct(u, v) / norm(u) / norm(v);
     }
@@ -17,10 +16,11 @@ public class LinearAlgebraUtil {
     public static double dotProduct(List<Double> u, List<Double> v) {
         Preconditions.checkNotNull(u);
         Preconditions.checkNotNull(v);
-        Preconditions.checkArgument(u.size() == v.size(), "Vectors are not the same length");
+
+        final int dimensions = Math.min(u.size(), v.size());
 
         double acc = 0;
-        for (int i = 0; i < u.size(); ++i) {
+        for (int i = 0; i < dimensions; ++i) {
             acc += u.get(i) * v.get(i);
         }
         return acc;
