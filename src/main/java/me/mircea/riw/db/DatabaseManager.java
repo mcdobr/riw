@@ -5,13 +5,19 @@ import com.mongodb.client.*;
 import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.result.UpdateResult;
+import jdk.internal.util.Preconditions;
 import me.mircea.riw.model.Document;
 import me.mircea.riw.model.Term;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import javax.xml.crypto.Data;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -22,20 +28,15 @@ import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
 
 public class DatabaseManager {
-    private static final DatabaseManager instance = new DatabaseManager();
-
-    public static DatabaseManager getInstance() {
-        return instance;
-    }
-
     private final MongoClient mongoClient;
     private final MongoDatabase database;
     private final MongoCollection<Document> documents;
     private final MongoCollection<Term> terms;
 
-
-    private DatabaseManager() {
-        this.mongoClient = MongoClients.create();
+    public DatabaseManager(String connectionString) {
+        //this.mongoClient = MongoClients.create(config.getProperty("dbConnection"));
+        this.mongoClient = MongoClients.create(connectionString);
+        //this.mongoClient = MongoClients.create();
 
         CodecRegistry pojoCodecRegistry = fromRegistries(
                 MongoClientSettings.getDefaultCodecRegistry(),

@@ -18,9 +18,10 @@ public class QuantitativeSearcher {
     private final DatabaseManager dbManager;
     private final long noDocuments;
 
-    public QuantitativeSearcher() {
-        dbManager = DatabaseManager.getInstance();
-        noDocuments = dbManager.getNumberOfDocuments();
+    public QuantitativeSearcher(DatabaseManager dbManager) {
+        Preconditions.checkNotNull(dbManager);
+        this.dbManager = dbManager;
+        this.noDocuments = dbManager.getNumberOfDocuments();
     }
 
     public List<SimpleImmutableEntry<Document, Double>> search(String query) {
@@ -70,6 +71,9 @@ public class QuantitativeSearcher {
         for (Term term : terms) {
             vector.add(tfidf(doc, term));
         }
+
+        // TODO: use all terms in relevant documents + query
+
         return vector;
     }
 

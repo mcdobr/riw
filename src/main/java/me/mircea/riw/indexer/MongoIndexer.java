@@ -20,8 +20,9 @@ public class MongoIndexer implements AsyncQueueableIndexer {
     private final BlockingQueue<Document> documentQueue;
     private final DatabaseManager dbManager;
 
-    public MongoIndexer() {
-        this.dbManager = DatabaseManager.getInstance();
+    public MongoIndexer(DatabaseManager dbManager) {
+        Preconditions.checkNotNull(dbManager);
+        this.dbManager = dbManager;
         this.documentQueue = new LinkedBlockingQueue<>();
     }
 

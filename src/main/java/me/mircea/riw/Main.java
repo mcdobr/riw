@@ -10,24 +10,39 @@ import me.mircea.riw.search.QuantitativeSearcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.print.Doc;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.*;
 import static java.util.AbstractMap.*;
 
 public class Main {
     private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
-    private static final ExecutorService WORKER_EXECUTOR = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-    private static final List<AsyncQueueableIndexer> WORKERS = new ArrayList<>();
-    private static final DatabaseManager DATABASE_MANAGER = DatabaseManager.getInstance();
-
+    private static final DatabaseManager DATABASE_MANAGER;
+    private static final ExecutorService WORKER_EXECUTOR;
+    private static final List<AsyncQueueableIndexer> WORKERS;
 
     static {
-        for (int i = 0; i < Runtime.getRuntime().availableProcessors(); ++i) {
-            MongoIndexer worker = new MongoIndexer();
+        Properties config = new Properties();
+        try {
+            InputStream configStream = Main.class.getClassLoader().getResourceAsStream("config.properties");
+            config.load(configStream);
+        } catch (IOException ie) {
+            LOGGER.error("Could not read config file. Exiting abnormally");
+            System.exit(-1);
+        }
+
+        DATABASE_MANAGER = new DatabaseManager(config.getProperty("dbConnection"));
+        final int NO_THREADS = Integer.parseInt(config.getProperty("noThreads"));
+        final int NO_WORKERS = Integer.parseInt(config.getProperty("noWorkers"));
+
+        WORKER_EXECUTOR = Executors.newFixedThreadPool(NO_THREADS);
+        WORKERS = new ArrayList<>();
+        for (int i = 0; i < NO_WORKERS; ++i) {
+            MongoIndexer worker = new MongoIndexer(DATABASE_MANAGER);
             WORKERS.add(worker);
             WORKER_EXECUTOR.submit(worker);
         }
@@ -49,7 +64,7 @@ public class Main {
                     DATABASE_MANAGER.clean();
                     break;
                 case "search":
-                    QuantitativeSearcher searcher = new QuantitativeSearcher();
+                    QuantitativeSearcher searcher = new QuantitativeSearcher(DATABASE_MANAGER);
                     System.out.println(args[1]);
                     List<SimpleImmutableEntry<Document, Double>> searchResults = searcher.search(args[1]);
 
