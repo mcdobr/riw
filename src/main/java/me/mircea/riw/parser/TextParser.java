@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.google.common.base.Preconditions;
 import me.mircea.riw.model.Document;
@@ -39,12 +40,15 @@ public class TextParser implements Parser {
         Preconditions.checkNotNull(path);
         String text = new String(Files.readAllBytes(path));
 
-        return new Document(text, path.toString());
+        Map<String, Integer> stemAppearances = extractWordStems(text);
+
+        return new Document(path.toString(), stemAppearances);
     }
 
-    public Map<String, Integer> parseFile(File file) throws IOException {
-        String text = new String(Files.readAllBytes(Paths.get(file.getPath())), StandardCharsets.UTF_8);
-        return extractWordStems(text);
+    public Map<String, Integer> extractWordStems(Path path) throws IOException{
+        //Files.lines(path).map()
+
+        throw new UnsupportedOperationException("Not implemented yet");
     }
 
     public Map<String, Integer> extractWordStems(String text) {

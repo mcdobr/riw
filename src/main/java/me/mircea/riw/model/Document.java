@@ -1,5 +1,6 @@
 package me.mircea.riw.model;
 
+import com.google.common.base.Preconditions;
 import me.mircea.riw.parser.TextParser;
 import org.bson.types.ObjectId;
 import org.jsoup.nodes.Element;
@@ -32,11 +33,17 @@ public class Document {
         this.terms = new HashMap<>();
     }
 
-    public Document(String text, String absUrl) {
+    public Document(String absUrl, String text) {
         //this.id = new ObjectId();
         this.text = text;
         this.absUrl = absUrl;
         this.terms = new TextParser().extractWordStems(this.text);
+    }
+
+    public Document(String absUrl, Map<String, Integer> terms) {
+        Preconditions.checkNotNull(terms);
+        this.absUrl = absUrl;
+        this.terms = terms;
     }
 
     public Document(org.jsoup.nodes.Document htmlDoc) {

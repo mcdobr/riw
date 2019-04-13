@@ -12,8 +12,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Paths;
+import java.io.InputStream;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -80,6 +80,7 @@ public class Main {
                     QuantitativeSearcher searcher = new QuantitativeSearcher(DATABASE_MANAGER);
                     List<SimpleImmutableEntry<Document, Double>> searchResults = searcher.search(args[1]);
 
+                    System.out.println(args[1]);
                     System.out.printf("%d documents found %n", searchResults.size());
                     searchResults.forEach(kvp -> System.out.printf("%s: %f%n", kvp.getKey(), kvp.getValue()));
                     break;

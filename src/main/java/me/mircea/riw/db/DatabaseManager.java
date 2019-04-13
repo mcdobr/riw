@@ -27,9 +27,7 @@ public class DatabaseManager {
     private final MongoCollection<Term> terms;
 
     public DatabaseManager(String connectionString) {
-        //this.mongoClient = MongoClients.create(config.getProperty("dbConnection"));
         this.mongoClient = MongoClients.create(connectionString);
-        //this.mongoClient = MongoClients.create();
 
         CodecRegistry pojoCodecRegistry = fromRegistries(
                 MongoClientSettings.getDefaultCodecRegistry(),

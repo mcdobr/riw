@@ -1,8 +1,8 @@
 package me.mircea.riw.search;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import me.mircea.riw.db.DatabaseManager;
 import me.mircea.riw.model.Document;
 import me.mircea.riw.model.Term;
@@ -27,68 +27,79 @@ public class QuantitativeSearcher {
 
     public List<SimpleImmutableEntry<Document, Double>> search(String query) {
         Preconditions.checkNotNull(query);
-        return search(new Document(query, "query"));
+        return search(new Document("query", query));
     }
 
     public List<SimpleImmutableEntry<Document, Double>> search(Document query) {
         Preconditions.checkNotNull(query);
 
-        List<Term> queryTerms = lookupQueryTerms(query);
-        List<Document> relevantDocuments = lookupRelevantDocuments(queryTerms);
-        List<Term> relevantTerms = lookupRelevantTerms(relevantDocuments);
+        Iterable<Term> queryTerms = lookupQueryTerms(query);
+        Iterable<Document> relevantDocuments = lookupRelevantDocuments(queryTerms);
 
-        List<Double> queryVector = createVector(query, relevantTerms);
-        Map<Document, List<Double>> relevantDocumentVectors = createDocumentVectors(relevantTerms, relevantDocuments);
+        List<Double> queryVector = createVector(query, queryTerms);
+        Map<Document, List<Double>> documentVectors = createDocumentVectors(queryTerms, relevantDocuments);
 
-        List<SimpleImmutableEntry<Document, Double>> documentRelevancePairs = new ArrayList<>(relevantDocuments.size());
-        relevantDocumentVectors.forEach((doc, docVector) -> {
+        List<SimpleImmutableEntry<Document, Double>> documentRelevancePairs = new ArrayList<>();
+
+        documentVectors.forEach((doc, docVector) -> {
             Double relevance = LinearAlgebraUtil.cosine(docVector, queryVector);
             documentRelevancePairs.add(new SimpleImmutableEntry<>(doc, relevance));
         });
-
         Comparator<SimpleImmutableEntry<Document, Double>> byRelevance =
                 Comparator.comparing(entry -> -entry.getValue());
         documentRelevancePairs.sort(byRelevance);
         return documentRelevancePairs;
     }
 
-    private Map<Document, List<Double>> createDocumentVectors(List<Term> relevantTerms, List<Document> relevantDocuments) {
-        Preconditions.checkNotNull(relevantTerms);
+    private Map<Document, List<Double>> createDocumentVectors(Iterable<Term> queryTerms, Iterable<Document> relevantDocuments) {
+        Preconditions.checkNotNull(queryTerms);
         Preconditions.checkNotNull(relevantDocuments);
 
-        Map<Document, List<Double>> relevantDocumentVectors = new HashMap<>(relevantDocuments.size());
+        Map<Document, List<Double>> relevantDocumentVectors = new HashMap<>();
         for (Document doc : relevantDocuments) {
-            relevantDocumentVectors.put(doc, createVector(doc, relevantTerms));
+            relevantDocumentVectors.put(doc, createVector(doc, queryTerms));
         }
 
         return relevantDocumentVectors;
     }
 
-    private List<Double> createVector(Document doc, Collection<Term> terms) {
+    private List<Double> createVector(Document doc, Iterable<Term> queryTerms) {
         Preconditions.checkNotNull(doc);
-        Preconditions.checkNotNull(terms);
+        Preconditions.checkNotNull(queryTerms);
 
-        List<Double> vector = new ArrayList<>(terms.size());
+        Set<String> seenTerms = new LinkedHashSet<>();
+        List<Double> vector = new ArrayList<>();
 
-        for (Term term : terms) {
-            vector.add(tfidf(doc, term));
+        for (Term term : queryTerms) {
+            if (!seenTerms.contains(term.getName())) {
+                vector.add(tfidf(doc, term));
+                seenTerms.add(term.getName());
+            }
+        }
+
+        Iterable<Term> documentTerms = lookupTermsOfDocument(doc);
+        for (Term term : documentTerms) {
+            if (!seenTerms.contains(term.getName())) {
+                vector.add(tfidf(doc, term));
+                seenTerms.add(term.getName());
+            }
         }
 
         return vector;
     }
 
-    private List<Term> lookupQueryTerms(Document query) {
+    private Iterable<Term> lookupQueryTerms(Document query) {
         Preconditions.checkNotNull(query);
         Set<String> stems = query.getTerms().keySet();
         if (stems.isEmpty())
             return Collections.emptyList();
         else
-            return Lists.newArrayList(dbManager.getTerms(stems));
+            return dbManager.getTerms(stems);
     }
 
-    private List<Document> lookupRelevantDocuments(Collection<Term> terms) {
+    private Iterable<Document> lookupRelevantDocuments(Iterable<Term> terms) {
         Preconditions.checkNotNull(terms);
-        if (terms.isEmpty()) {
+        if (Iterables.isEmpty(terms)) {
             return Collections.emptyList();
         } else {
             Set<ObjectId> relevantDocumentIds = new HashSet<>();
@@ -99,25 +110,18 @@ public class QuantitativeSearcher {
                         .collect(Collectors.toList());
                 relevantDocumentIds.addAll(docIds);
             }
-            return Lists.newArrayList(dbManager.getDocuments(relevantDocumentIds));
+            return dbManager.getDocuments(relevantDocumentIds);
         }
     }
 
-    private List<Term> lookupRelevantTerms(Collection<Document> documents) {
-        Preconditions.checkNotNull(documents);
-        if (documents.isEmpty()) {
-            return Collections.emptyList();
-        } else {
-            Set<String> termStrings = new HashSet<>();
-            for (Document doc : documents) {
-                termStrings.addAll(doc.getTerms().keySet());
-            }
+    private Iterable<Term> lookupTermsOfDocument(Document doc) {
+        Preconditions.checkNotNull(doc);
 
-            if (termStrings.isEmpty())
-                return Collections.emptyList();
-            else
-                return Lists.newArrayList(dbManager.getTerms(termStrings));
-        }
+        Set<String> termStrings = doc.getTerms().keySet();
+        if (termStrings.isEmpty())
+            return Collections.emptyList();
+        else
+            return dbManager.getTerms(termStrings);
     }
 
     private double tfidf(Document doc, Term term) {
