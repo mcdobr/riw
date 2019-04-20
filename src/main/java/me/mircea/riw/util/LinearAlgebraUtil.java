@@ -5,6 +5,8 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 
 public class LinearAlgebraUtil {
+    // TODO: should've written unit tests before writing this... guess after
+
     public static double cosine(List<Double> u, List<Double> v) {
         Preconditions.checkNotNull(u);
         Preconditions.checkNotNull(v);

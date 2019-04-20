@@ -10,9 +10,9 @@ import java.util.Set;
 import static org.junit.Assert.*;
 
 public class BooleanSearcherTest {
-    private Document doc1 = new Document("Muhammad Ali is beaten by smokin' Joe Frazier in their boxing bout", "doc1");
-    private Document doc2 = new Document("ali began boxing at age 12. Ali was born and raised in Louisville, Kentucky.", "doc2");
-    private Document doc3 = new Document("Some string is here to show off that smokin is bad", "doc3");
+    private Document doc1 = new Document("doc1", "Muhammad Ali is beaten by smokin' Joe Frazier in their boxing bout");
+    private Document doc2 = new Document("doc2", "ali began boxing at age 12. Ali was born and raised in Louisville, Kentucky.");
+    private Document doc3 = new Document("doc3", "Some string is here to show off that smokin is bad");
     private BooleanSearcher booleanSearcher;
 
     @Before
@@ -34,7 +34,7 @@ public class BooleanSearcherTest {
 
     @Test
     public void shouldAndCorrectly() {
-        Set<String> intersection = booleanSearcher.intersection("ali", "boxing");
+        Set<String> intersection = booleanSearcher.intersection("ali", "box");
         assertEquals(2, intersection.size());
     }
 
