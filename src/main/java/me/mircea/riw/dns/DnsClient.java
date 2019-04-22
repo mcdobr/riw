@@ -3,6 +3,7 @@ package me.mircea.riw.dns;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.xml.crypto.Data;
 import java.io.IOException;
 import java.net.*;
 import java.nio.charset.Charset;
@@ -62,87 +63,34 @@ public class DnsClient {
     }
 
 
+    public InetAddress recursiveLookup(String host) {
+        InetAddress result = null;
 
-    public InetAddress getByName(String host) {
+        try {
+            sendRequest(host, true);
+            DatagramPacket responsePacket = getResponsePacket();
+            result = parseSimpleLookupResponse(responsePacket);
+        } catch (SocketTimeoutException e) {
+            LOGGER.warn("Could not receive datagram before timeout {}", e);
+        } catch (IOException e) {
+            LOGGER.warn("An I/O error occured {}", e);
+        } catch (DnsException e) {
+            LOGGER.warn("A DNS error occured {}", e);
+        }
+
+        return result;
+    }
+
+    public InetAddress iterativeLookup(String host) {
         InetAddress result = null;
 
         boolean successfulCommunication = false;
         while (!successfulCommunication) {
 
             try {
-                sendRequest(host);
+                sendRequest(host, false);
                 DatagramPacket responsePacket = getResponsePacket();
-                byte[] response = responsePacket.getData();
-                checkReturnCode(response);
-
-
-                int answerCount = getTwoBytes(response, HEADER_ANSWER_RECORD_COUNT_OFFSET);
-                final int answersOffset = getAnswersOffset(response);
-
-                int offset = answersOffset;
-                int currentAnswer = 0;
-
-                while (currentAnswer < answerCount) {
-                    Stack<Integer> offsetStack = new Stack<>();
-                    HashSet<Integer> visitedPointers = new HashSet<>();
-
-                    offsetStack.push(offset);
-                    visitedPointers.add(offset);
-
-                    while (!offsetStack.isEmpty()) {
-                        offset = offsetStack.peek();
-
-                        // is pointer
-                        if ((response[offset] & 0xFF) >= 0xC0) {
-                            int ptr = ((response[offset] & 0x3F) << 8) | (response[offset + 1] & 0xFF);
-                            if (!visitedPointers.contains(ptr)) {
-                                offsetStack.push(ptr);
-                                visitedPointers.add(ptr);
-                            } else {
-                                offsetStack.pop();
-                            }
-                        } else {
-                            List<String> hostParts = new ArrayList<>();
-
-                            while (response[offset] != 0x00) {
-                                int len = response[offset];
-                                hostParts.add(new String(response, offset + 1, len));
-                                offset += len + 1;
-                            }
-                            String returnedHost = String.join(".", hostParts);
-
-                            offsetStack.pop();
-                        }
-                    }
-
-                    // increment offset on type
-                    if ((response[offset] & 0xFF) >= 0xC0) {
-                        offset += 2;
-                    } else if (response[offset] == 0x00) {
-                        ++offset;
-                    }
-
-
-                    int type = getTwoBytes(response, offset);
-                    offset += 2;
-
-                    int clazz = getTwoBytes(response, offset);
-                    offset += 2;
-
-                    int ttl = getFourBytes(response, offset);
-                    offset += 4;
-
-                    int rdl = getTwoBytes(response, offset);
-                    offset += 2;
-
-                    // parse resource data
-                    result = InetAddress.getByAddress(Arrays.copyOfRange(response, offset, offset + rdl));
-
-                    // set offset to next answer
-                    offset += rdl;
-                    ++currentAnswer;
-                }
-
+                result = parseSimpleLookupResponse(responsePacket);
 
                 successfulCommunication = true;
             } catch (SocketTimeoutException e) {
@@ -157,7 +105,7 @@ public class DnsClient {
         return result;
     }
 
-    private void sendRequest(String host) throws IOException {
+    private void sendRequest(String host, boolean recursive) throws IOException {
         byte[] request = new byte[DNS_HEADER_LENGTH + host.length() + 2 + DNS_QTYPE_LENGTH + DNS_QCLASS_LENGTH];
 
         int id = rng.nextInt(1 << 16);
@@ -170,8 +118,13 @@ public class DnsClient {
         request[HEADER_FLAGS_AND_CODES_OFFSET] &= ~(1 << QR_FLAG_OFFSET);
         // set opcode to 0
         request[HEADER_FLAGS_AND_CODES_OFFSET] &= ~(0x0F << OPCODE_OFFSET);
-        // set rd to 0
-        request[HEADER_FLAGS_AND_CODES_OFFSET] &= ~(1 << RD_FLAG_OFFSET);
+
+        if (recursive) {
+            request[HEADER_FLAGS_AND_CODES_OFFSET] |= (1 << RD_FLAG_OFFSET);
+        } else {
+            // set rd to 0
+            request[HEADER_FLAGS_AND_CODES_OFFSET] &= ~(1 << RD_FLAG_OFFSET);
+        }
 
         // Set question count to 1
         request[HEADER_QUESTION_COUNT_OFFSET] = 0x00;
@@ -206,6 +159,82 @@ public class DnsClient {
 
         socket.receive(responsePacket);
         return responsePacket;
+    }
+
+    private InetAddress parseSimpleLookupResponse(DatagramPacket responsePacket) throws DnsException, UnknownHostException {
+        InetAddress result = null;
+
+        byte[] response = responsePacket.getData();
+        checkReturnCode(response);
+
+        int answerCount = getTwoBytes(response, HEADER_ANSWER_RECORD_COUNT_OFFSET);
+        final int answersOffset = getAnswersOffset(response);
+
+        int offset = answersOffset;
+        int currentAnswer = 0;
+
+        while (currentAnswer < answerCount) {
+            Stack<Integer> offsetStack = new Stack<>();
+            HashSet<Integer> visitedPointers = new HashSet<>();
+
+            offsetStack.push(offset);
+            visitedPointers.add(offset);
+
+            while (!offsetStack.isEmpty()) {
+                offset = offsetStack.peek();
+
+                // is pointer
+                if ((response[offset] & 0xFF) >= 0xC0) {
+                    int ptr = ((response[offset] & 0x3F) << 8) | (response[offset + 1] & 0xFF);
+                    if (!visitedPointers.contains(ptr)) {
+                        offsetStack.push(ptr);
+                        visitedPointers.add(ptr);
+                    } else {
+                        offsetStack.pop();
+                    }
+                } else {
+                    List<String> hostParts = new ArrayList<>();
+
+                    while (response[offset] != 0x00) {
+                        int len = response[offset];
+                        hostParts.add(new String(response, offset + 1, len));
+                        offset += len + 1;
+                    }
+                    String returnedHost = String.join(".", hostParts);
+
+                    offsetStack.pop();
+                }
+            }
+
+            // increment offset on type
+            if ((response[offset] & 0xFF) >= 0xC0) {
+                offset += 2;
+            } else if (response[offset] == 0x00) {
+                ++offset;
+            }
+
+
+            int type = getTwoBytes(response, offset);
+            offset += 2;
+
+            int clazz = getTwoBytes(response, offset);
+            offset += 2;
+
+            int ttl = getFourBytes(response, offset);
+            offset += 4;
+
+            int rdl = getTwoBytes(response, offset);
+            offset += 2;
+
+            // parse resource data
+            result = InetAddress.getByAddress(Arrays.copyOfRange(response, offset, offset + rdl));
+
+            // set offset to next answer
+            offset += rdl;
+            ++currentAnswer;
+        }
+
+        return result;
     }
 
     private void checkReturnCode(byte[] response) throws DnsException {
