@@ -9,8 +9,8 @@ public class CrawlerTest {
 
     @Test
     public void shouldCrawlASimpleDomain() throws URISyntaxException {
-        //Crawler crawler = new Crawler(new NoopIndexer(), "http://riweb.tibeica.com/crawl");
-        Crawler crawler = new Crawler(new NoopIndexer(), "https://www.litera.ro/");
+        Crawler crawler = new Crawler(new NoopIndexer(), "http://riweb.tibeica.com/crawl");
+        //Crawler crawler = new Crawler(new NoopIndexer(), "https://www.litera.ro/");
 
         crawler.crawl();
     }

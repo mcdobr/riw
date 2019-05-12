@@ -1,5 +1,9 @@
 package me.mircea.riw.crawler;
 
+import crawlercommons.robots.BaseRobotRules;
+import crawlercommons.robots.BaseRobotsParser;
+import crawlercommons.robots.SimpleRobotRules;
+import crawlercommons.robots.SimpleRobotRulesParser;
 import me.mircea.riw.http.HttpClient;
 import me.mircea.riw.http.HttpRequest;
 import me.mircea.riw.http.HttpResponse;
@@ -15,10 +19,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 
 public class Crawler {
     private static final Logger LOGGER = LoggerFactory.getLogger(Crawler.class);
@@ -48,6 +49,18 @@ public class Crawler {
         while (!this.activeQueue.isEmpty()) {
             URI uri = this.activeQueue.poll();
 
+            BaseRobotRules robotRules = new SimpleRobotRules();
+
+
+            /*
+            try {
+                URI robotsTxtURI = new URI(uri.getScheme(), uri.getHost(), "robots.txt");
+                BaseRobotsParser robotsParser = new SimpleRobotRulesParser();
+                robotsParser.
+            } catch (URISyntaxException e) {
+                LOGGER.warn("Could not find robots.txt file on domain {}. Exception {}", uri.getAuthority(), e);
+            }*/
+
             if (!visited.contains(uri)) {
                 visited.add(uri);
 
@@ -67,27 +80,25 @@ public class Crawler {
                     org.jsoup.nodes.Document jsoupDoc = Jsoup.connect(uri.toString()).get();
                     Elements links = jsoupDoc.select("a[href]");
 
-                    for (Element link : links) {
-                        try {
-                            String str = link.absUrl("href");
-                            if (!str.isEmpty()) {
-                                URI other = new URI(str);
-
-                                if (other.getAuthority().equals(this.targetAuthority)) {
-                                    activeQueue.add(other);
-                                }
-                            }
-                        } catch (URISyntaxException e) {
-                            LOGGER.info("URI was malformed {}", e);
-                        }
+                    Element metaRobotsTag = jsoupDoc.selectFirst("meta[name='robots']");
+                    Set<String> instructions = Collections.EMPTY_SET;
+                    if (metaRobotsTag != null) {
+                        instructions = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+                        instructions.addAll(Arrays.asList(metaRobotsTag.attr("content").split(",")));
                     }
 
-                    //Document doc = new Document(uri.toString(), body);
-                    Document doc = new Document(uri.toString(), jsoupDoc.text());
-                    indexer.indexDocument(doc);
+
+                    if (shouldFollowLinks(instructions)) {
+                        followLinks(links);
+                    }
+
+                    if (shouldIndex(instructions)) {
+                        indexDocument(uri, jsoupDoc);
+                    }
 
 
 
+                    // TODO: modify this to be cpu thread friendly
                     Thread.sleep(1000);
                 } catch (UnknownHostException e) {
                     LOGGER.warn("Host unknown {}", e);
@@ -98,5 +109,38 @@ public class Crawler {
                 }
             }
         }
+
+        LOGGER.info("{} urls visited.", visited.size());
+    }
+
+    private void followLinks(Elements links) {
+        for (Element link : links) {
+            try {
+                String str = link.absUrl("href");
+                if (!str.isEmpty()) {
+                    URI other = new URI(str);
+
+                    if (other.getAuthority().equals(this.targetAuthority)) {
+                        activeQueue.add(other);
+                    }
+                }
+            } catch (URISyntaxException e) {
+                LOGGER.info("URI was malformed {}", e);
+            }
+        }
+    }
+
+    private void indexDocument(URI uri, org.jsoup.nodes.Document jsoupDoc) {
+        //Document doc = new Document(uri.toString(), body);
+        Document doc = new Document(uri.toString(), jsoupDoc.text());
+        indexer.indexDocument(doc);
+    }
+
+    private boolean shouldFollowLinks(Set<String> instructions) {
+        return !instructions.contains("nofollow");
+    }
+
+    private boolean shouldIndex(Set<String> instructions) {
+        return !instructions.contains("noindex");
     }
 }
