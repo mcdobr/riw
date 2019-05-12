@@ -11,7 +11,7 @@ import static org.junit.Assert.assertEquals;
 
 public class HttpClientTest {
     @Test
-    public void shouldGetPage() throws URISyntaxException, IOException {
+    public void shouldGetPage() throws URISyntaxException, IOException { 
         HttpClient client = new HttpClient();
 
         HttpRequest simpleGet = HttpRequest.newBuilder()

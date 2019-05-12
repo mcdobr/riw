@@ -79,6 +79,11 @@ public final class HttpResponse {
         return new Builder();
     }
 
+    // TODO: sa fie string sau o clasa separata?
+    public String getBody() {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
     public static class Builder {
         private HttpVersion version;
         private int status;
