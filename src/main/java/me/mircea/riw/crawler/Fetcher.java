@@ -10,9 +10,11 @@ import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.*;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Set;
@@ -117,7 +119,7 @@ public class Fetcher implements Runnable {
     }
 
     private boolean shouldIndex(Set<String> instructions) {
-        return !instructions.contains("noindex") && instructions.contains("none");
+        return !instructions.contains("noindex") && !instructions.contains("none");
     }
 
     private void followLinks(Elements links) {
@@ -138,13 +140,40 @@ public class Fetcher implements Runnable {
     }
 
     private void saveDocument(URI uri, org.jsoup.nodes.Document jsoupDoc) {
-        //Document doc = new Document(uri.toString(), body);
-        //Document doc = new Document(uri.toString(), jsoupDoc.text());
-        //indexer.indexDocument(doc);
+        Path fileSystemTranslatedPath = translateToPath(uri);
+
+        BufferedWriter bw = null;
+        try {
+            Files.createDirectories(fileSystemTranslatedPath.getParent());
+            bw = Files.newBufferedWriter(fileSystemTranslatedPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
+            bw.write(jsoupDoc.html());
+            LOGGER.info("Saving URI {} to file {}", uri, fileSystemTranslatedPath);
+        } catch (IOException e) {
+            LOGGER.warn("An I/O exception occured when trying to save the files on URI {}: {}", uri, e);
+        } finally {
+            if (bw != null) {
+                try {
+                    bw.close();
+                } catch (IOException e) {
+                    LOGGER.warn("An exception occured while trying to close a writer {}", e);
+                }
+            }
+        }
     }
 
     private boolean hasBeenVisited(URI uri) {
-        // TODO: implement real logic here
-        return false;
+        Path fileSystemTranslatedPath = translateToPath(uri);
+        return Files.exists(fileSystemTranslatedPath);
+    }
+
+    private Path translateToPath(URI uri) {
+        Path pathOfUri = Paths.get(controller.getDestination().toString(), uri.getHost(), uri.getPath());
+        if (pathOfUri.endsWith("/")) {
+            pathOfUri = Paths.get(pathOfUri.toString(), "index.html");
+        }
+        if (uri.getQuery() != null) {
+            pathOfUri = Paths.get(pathOfUri.toString(), uri.getQuery());
+        }
+        return pathOfUri;
     }
 }

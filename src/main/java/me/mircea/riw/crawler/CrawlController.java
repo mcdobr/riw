@@ -23,7 +23,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 public class CrawlController {
     private static final Logger LOGGER = LoggerFactory.getLogger(CrawlController.class);
-    private static final String BOT_NAME = "dmcBot";
+    //private static final String BOT_NAME = "dmcBot";
+    private static final String BOT_NAME = "RIWEB_CRAWLER";
     private static final long DEFAULT_CRAWL_DELAY = 1000;
 
 
