@@ -61,15 +61,15 @@ public final class HttpResponse {
                 .status(scanner.nextInt())
                 .reasonPhrase(scanner.nextLine().trim());
 
-        String header = null;
+        String header;
         while (!(header = br.readLine().trim()).isEmpty()) {
-            String headerParts[] = header.split(":", 2);
+            String[] headerParts = header.split(":", 2);
             builder.addHeader(headerParts[0], headerParts[1]);
         }
 
-        String bodyLine = null;
+        String bodyLine;
         while ((bodyLine = br.readLine()) != null) {
-            builder.bodyBuilder.append(bodyLine);
+            builder.bodyBuilder.append(bodyLine).append(System.lineSeparator());
         }
 
         return builder.build();
@@ -79,9 +79,8 @@ public final class HttpResponse {
         return new Builder();
     }
 
-    // TODO: sa fie string sau o clasa separata?
     public String getBody() {
-        throw new UnsupportedOperationException("Not implemented yet");
+        return body;
     }
 
     public static class Builder {

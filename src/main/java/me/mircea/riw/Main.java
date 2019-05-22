@@ -1,6 +1,7 @@
 package me.mircea.riw;
 
 import com.google.common.base.Stopwatch;
+import me.mircea.riw.crawler.CrawlController;
 import me.mircea.riw.db.DatabaseManager;
 import me.mircea.riw.indexer.AsyncQueueableIndexer;
 import me.mircea.riw.indexer.MongoIndexer;
@@ -12,6 +13,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Paths;
 import java.io.InputStream;
 import java.time.Instant;
@@ -53,7 +56,6 @@ public class Main {
         for (int i = 0; i < NO_WORKERS; ++i) {
             MongoIndexer worker = new MongoIndexer(DATABASE_MANAGER, new TextParser());
             WORKERS.add(worker);
-            //WORKER_EXECUTOR.submit(worker);
             COMPLETION_SERVICE.submit(worker);
         }
     }
@@ -69,6 +71,17 @@ public class Main {
 
         try {
             switch (args[0].toLowerCase()) {
+                case "crawl":
+                    CrawlController controller = new CrawlController(4);
+
+                    try {
+                        controller.add(new URI("http://riweb.tibeica.com/crawl/"));
+                    } catch (URISyntaxException e) {
+                        LOGGER.warn("A URI was malformed {}", e);
+                    }
+                    controller.crawl();
+
+                    break;
                 case "index":
                     Traverser traverser = new Traverser(Paths.get(args[1]), WORKERS);
                     traverser.traverse();
