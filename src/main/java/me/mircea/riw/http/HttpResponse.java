@@ -11,6 +11,12 @@ import java.util.Map;
 import java.util.Scanner;
 
 public final class HttpResponse {
+    private static final int MAX_REDIRECTS;
+
+    static {
+        MAX_REDIRECTS = 3;
+    }
+
     private final HttpVersion version;
     private final int status;
     private final String reasonPhrase;

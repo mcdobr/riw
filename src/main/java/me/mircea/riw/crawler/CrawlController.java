@@ -11,15 +11,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.SocketException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.*;
 
 public class CrawlController {
     private static final Logger LOGGER = LoggerFactory.getLogger(CrawlController.class);
@@ -29,16 +27,18 @@ public class CrawlController {
 
 
     private final BlockingQueue<URI> activeQueue;
-    private final ExecutorService executor;
+    private final ScheduledExecutorService scheduler;
     private final Map<String, BaseRobotRules> hostRobotRules;
     private final Map<String, Fetcher> hostFetchers;
+    private final Map<Fetcher, ScheduledFuture<?>> fetcherTasks;
     private final Path destination;
 
     public CrawlController(int noThreads, Path destination) {
-        this.activeQueue = new LinkedBlockingQueue<>();
-        this.executor = Executors.newFixedThreadPool(noThreads);
+        this.activeQueue = new ActiveDownloadQueue<>();
+        this.scheduler = Executors.newScheduledThreadPool(noThreads);
         this.hostRobotRules = new HashMap<>();
         this.hostFetchers = new HashMap<>();
+        this.fetcherTasks = new HashMap<>();
         this.destination = destination;
     }
 
@@ -54,6 +54,18 @@ public class CrawlController {
         return destination;
     }
 
+    public void shutdownFetcher(Fetcher fetcher) {
+        ScheduledFuture<?> task = fetcherTasks.remove(fetcher);
+        if (!task.isDone()) {
+            //boolean isCancelled =
+            task.cancel(true);
+        }
+
+        task.cancel(true);
+
+        hostFetchers.remove(fetcher.getTargetHost(), fetcher);
+    }
+
     public void crawl() {
         while (true) {
             URI uri = activeQueue.poll();
@@ -61,11 +73,19 @@ public class CrawlController {
             if (uri != null) {
                 BaseRobotRules relevantRules = getHostRobotRulesFrom(uri);
                 if (relevantRules.isAllowed(uri.toString())) {
-                    Fetcher hostFetcher = getHostFetcherFor(uri);
-                    hostFetcher.fetch(uri);
+                    try {
+                        Fetcher hostFetcher = getHostFetcherFor(uri);
+                        hostFetcher.add(uri);
+                    } catch (SocketException | UnknownHostException e) {
+                        LOGGER.warn("Could not initialize fetcher for domain of uri {}");
+                    }
                 }
             }
         }
+    }
+
+    public boolean isNewDomain(URI uri) {
+        return uri != null && !hostFetchers.containsKey(uri.getHost());
     }
 
     /**
@@ -84,6 +104,7 @@ public class CrawlController {
                 HttpRequest getRequest = HttpRequest.newBuilder()
                         .get()
                         .uri(robotsTxtURI)
+                        .addHeader("Host", robotsTxtURI.getHost())
                         .addHeader("User-Agent", "Mozilla/5.0 (compatible; dmcBot/1.0)")
                         .addHeader("Connection", "close")
                         .build();
@@ -113,15 +134,22 @@ public class CrawlController {
     }
 
     /**
-     * @brief Get the fetcher task or create one
+     * @brief Get the fetcher or create one
      */
-    private Fetcher getHostFetcherFor(URI uri) {
+    private Fetcher getHostFetcherFor(URI uri) throws SocketException, UnknownHostException {
         if (hostFetchers.containsKey(uri.getHost())) {
             return hostFetchers.get(uri.getHost());
         } else {
             Fetcher hostFetcher = new Fetcher(this, uri);
             hostFetchers.put(uri.getHost(), hostFetcher);
-            executor.submit(hostFetcher);
+
+            BaseRobotRules hostRobotRules = getHostRobotRulesFrom(uri);
+            ScheduledFuture<?> future = scheduler.scheduleAtFixedRate(new FetcherTask(hostFetcher),
+                    0,
+                    hostRobotRules.getCrawlDelay(),
+                    TimeUnit.MILLISECONDS);
+
+            fetcherTasks.put(hostFetcher, future);
 
             return hostFetcher;
         }

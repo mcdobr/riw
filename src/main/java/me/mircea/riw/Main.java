@@ -72,10 +72,12 @@ public class Main {
         try {
             switch (args[0].toLowerCase()) {
                 case "crawl":
-                    CrawlController controller = new CrawlController(4, Paths.get("C:/Users/mircea/Desktop/dest/"));
+                    CrawlController controller = new CrawlController(1, Paths.get("C:/Users/mircea/Desktop/dest/"));
 
                     try {
-                        controller.add(new URI("http://riweb.tibeica.com/crawl/"));
+                        //controller.add(new URI("http://riweb.tibeica.com/crawl/"));
+                        controller.add(new URI("http://www.ace.tuiasi.ro/"));
+                        //controller.add(new URI("http://www.etti.tuiasi.ro/"));
                     } catch (URISyntaxException e) {
                         LOGGER.warn("A URI was malformed {}", e);
                     }

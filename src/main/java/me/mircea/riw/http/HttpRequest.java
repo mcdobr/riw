@@ -1,6 +1,7 @@
 package me.mircea.riw.http;
 
 import com.google.common.collect.ImmutableMap;
+import me.mircea.riw.dns.DnsClient;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -42,8 +43,8 @@ public final class HttpRequest {
 
         String requestLine = String.format("%s %s %s", this.method, this.uri.getPath(), this.version);
         rawRequestBuilder.addLine(requestLine);
-        rawRequestBuilder.addHeader("Host", this.uri.getHost());
-        this.headers.forEach((key, value) -> rawRequestBuilder.addHeader(key, value));
+
+        this.headers.forEach(rawRequestBuilder::addHeader);
         rawRequestBuilder.addLine();
         return rawRequestBuilder.build();
     }
@@ -57,10 +58,17 @@ public final class HttpRequest {
         private HttpVersion version;
         private URI uri;
         private Map<String, String> headers;
+        private DnsClient dnsClient;
 
         public Builder() {
             this.version = HttpVersion.HTTP_1_1;
-            this.headers = new HashMap<String, String>();
+            this.headers = new HashMap<>();
+            this.dnsClient = null;
+        }
+
+        public Builder withDnsClient(DnsClient dnsClient) {
+            this.dnsClient = dnsClient;
+            return this;
         }
 
         public HttpRequest build() {
@@ -118,14 +126,22 @@ public final class HttpRequest {
         }
 
         public Builder uri(String uri) throws URISyntaxException {
-            this.uri = new URI(uri);
+            return uri(new URI(uri));
+        }
+
+        public Builder uri(URI uri) throws URISyntaxException {
+            if (dnsClient != null) {
+                this.uri = new URI(uri.getScheme(),
+                        dnsClient.recursiveLookup(uri.getHost()).getHostAddress(),
+                        uri.getPath(),
+                        uri.getQuery(),
+                        null);
+            } else {
+                this.uri = uri;
+            }
             return this;
         }
 
-        public Builder uri(URI uri) {
-            this.uri = uri;
-            return this;
-        }
     }
 
 }

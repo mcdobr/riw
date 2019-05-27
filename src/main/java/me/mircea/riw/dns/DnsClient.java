@@ -8,8 +8,16 @@ import java.io.IOException;
 import java.net.*;
 import java.nio.charset.Charset;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 public class DnsClient {
+    private static final DnsCache DNS_CACHE;
+
+    static {
+        DNS_CACHE = new DnsCache();
+
+    }
+
     private static final Logger LOGGER = LoggerFactory.getLogger(DnsClient.class);
 
     private static final int DNS_PORT = 53;
