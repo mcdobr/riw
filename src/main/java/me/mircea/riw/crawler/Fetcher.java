@@ -19,15 +19,16 @@ import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.nio.file.*;
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class Fetcher {
     private static final Logger LOGGER = LoggerFactory.getLogger(Fetcher.class);
+    //private static final String USER_AGENT = "Mozilla/5.0 (compatible; dmcBot/1.0)";
+    private static final String USER_AGENT = "RIWEB_CRAWLER";
+
 
     private final CrawlController controller;
     private final DnsClient dnsClient;
@@ -89,7 +90,7 @@ public class Fetcher {
                 .get()
                 .uri(uri)
                 .addHeader("Host", uri.getHost())
-                .addHeader("User-Agent", "Mozilla/5.0 (compatible; dmcBot/1.0)")
+                .addHeader("User-Agent", USER_AGENT)
                 .addHeader("Connection", "close")
                 .build();
 
@@ -111,7 +112,7 @@ public class Fetcher {
 
 
     private void parseSuccessfulResponse(URI uri, HttpResponse response) {
-        LOGGER.info("Downloaded document at URI {} at {}", uri, Instant.now());
+        LOGGER.info("Downloading document at URI {} at {}", uri, Instant.now());
 
         Document htmlDoc = Jsoup.parse(response.getBody(), uri.toString());
         Elements links = htmlDoc.select("a[href]");
@@ -120,17 +121,21 @@ public class Fetcher {
         Set<String> instructions = Collections.emptySet();
         if (metaRobotsTag != null) {
             instructions = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-            instructions.addAll(Arrays.asList(metaRobotsTag.attr("content").split(",")));
-        }
 
-        if (shouldFollowLinks(instructions)) {
-            followLinks(links);
-            LOGGER.info("Following links from document at URI {}", uri);
+            String metaRobotsTagContent = metaRobotsTag.attr("content");
+            for (String str : metaRobotsTagContent.split(",")) {
+                instructions.add(str.trim());
+            }
         }
 
         if (shouldIndex(instructions)) {
             saveDocument(uri, htmlDoc);
-            LOGGER.info("Saving document at URI {}", uri);
+            LOGGER.info("Saved document at URI {}", uri);
+        }
+
+        if (shouldFollowLinks(instructions)) {
+            followLinks(uri, links);
+            LOGGER.info("Following links from document at URI {}", uri);
         }
     }
 
@@ -142,7 +147,7 @@ public class Fetcher {
         return !instructions.contains("noindex") && !instructions.contains("none");
     }
 
-    private void followLinks(Elements links) {
+    private void followLinks(URI uri, Elements links) {
         for (Element link : links) {
             try {
                 String str = link.absUrl("href");
@@ -150,7 +155,7 @@ public class Fetcher {
                     URI href = new URI(str);
                     href = new URI(href.getScheme(), href.getHost(), href.getPath(), href.getQuery(), null);
 
-                    if (!hasBeenVisited(href) && href.getHost().equals(this.targetHost)) {
+                    if (isWorthFollowing(uri, href)) {
                         this.controller.add(href);
                     }
                 }
@@ -158,6 +163,40 @@ public class Fetcher {
                 LOGGER.info("Reconstructed URI was malformed {}", e);
             }
         }
+    }
+
+    private boolean isWorthFollowing(URI src, URI dest) {
+        return !isTheSameResource(src, dest) && !hasBeenVisited(dest);
+
+    }
+
+    private boolean isTheSameResource(URI src, URI dest) {
+        boolean areEqual = true;
+        if (src.getScheme() != null && dest.getScheme() != null) {
+            areEqual &= src.getScheme().equals(dest.getScheme());
+        } else {
+            return false;
+        }
+
+        if (src.getHost() != null && dest.getHost() != null) {
+            areEqual &= src.getHost().equals(dest.getHost());
+        } else {
+            return false;
+        }
+
+        if (src.getPath() != null && dest.getPath() != null) {
+            areEqual &= src.getPath().equals(dest.getPath());
+        } else if ((src.getPath() == null) != (dest.getPath() == null)) {
+            return false;
+        }
+
+        if (src.getQuery() != null && dest.getQuery() != null) {
+            areEqual &= src.getQuery().equals(dest.getQuery());
+        } else if ((src.getQuery() == null) != (dest.getQuery() == null)) {
+            return false;
+        }
+
+        return areEqual;
     }
 
     private void saveDocument(URI uri, org.jsoup.nodes.Document jsoupDoc) {
@@ -168,7 +207,6 @@ public class Fetcher {
             Files.createDirectories(fileSystemTranslatedPath.getParent());
             bw = Files.newBufferedWriter(fileSystemTranslatedPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
             bw.write(jsoupDoc.html());
-            LOGGER.info("Saving URI {} to file {}", uri, fileSystemTranslatedPath);
         } catch (IOException e) {
             LOGGER.warn("An I/O exception occured when trying to save the files on URI {}: {}", uri, e);
         } finally {
@@ -191,7 +229,7 @@ public class Fetcher {
         uri = uri.normalize();
 
         Path pathOfUri = Paths.get(controller.getDestination().toString(), uri.getHost(), uri.getPath());
-        if (isTheRootOfDomain(uri)) {
+        if (isMissingIndex(uri)) {
             pathOfUri = Paths.get(pathOfUri.toString(), "index.html");
         }
         if (uri.getQuery() != null) {
@@ -205,14 +243,15 @@ public class Fetcher {
         return pathOfUri;
     }
 
-    private boolean isTheRootOfDomain(URI uri) {
+    private boolean isMissingIndex(URI uri) {
         URI auxUri = null;
         try {
             auxUri = new URI("http", uri.getHost(), null, null);
         } catch (URISyntaxException e) {
             LOGGER.warn("URL was malformed for {}", uri);
         }
-        return uri.equals(auxUri);
+
+        return uri.equals(auxUri) || uri.toString().endsWith("/");
     }
 
     private boolean isMissingExtension(Path path) {

@@ -37,6 +37,11 @@ public class ActiveDownloadQueue<E> extends LinkedBlockingQueue<E> {
         return foundElement;
     }
 
+    @Override
+    public boolean contains(Object o) {
+        return visited.contains(o);
+    }
+
     private void removeFromMemory(E e) {
         if (e != null)
             visited.remove(e);
