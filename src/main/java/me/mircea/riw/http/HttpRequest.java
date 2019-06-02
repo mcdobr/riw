@@ -12,12 +12,14 @@ public final class HttpRequest {
     private final HttpMethod method;
     private final HttpVersion version;
     private final URI uri;
+    private final URI humanFriendlyUri;
     private final ImmutableMap<String, String> headers;
 
     private HttpRequest(Builder httpRequestBuilder) {
         this.method = httpRequestBuilder.method;
         this.version = httpRequestBuilder.version;
         this.uri = httpRequestBuilder.uri;
+        this.humanFriendlyUri = httpRequestBuilder.humanFriendlyUri;
         this.headers = ImmutableMap.copyOf(httpRequestBuilder.headers);
     }
 
@@ -31,6 +33,10 @@ public final class HttpRequest {
 
     public URI uri() {
         return this.uri;
+    }
+
+    public URI humanFriendlyUri() {
+        return this.humanFriendlyUri;
     }
 
     public ImmutableMap<String, String> headers() {
@@ -57,6 +63,7 @@ public final class HttpRequest {
         private HttpMethod method;
         private HttpVersion version;
         private URI uri;
+        private URI humanFriendlyUri;
         private Map<String, String> headers;
         private DnsClient dnsClient;
 
@@ -116,7 +123,10 @@ public final class HttpRequest {
         }
 
         public Builder addHeader(String key, String value) {
-            headers.put(key.trim(), value.trim());
+            key = key.trim();
+            value = value.trim();
+
+            headers.put(key, value);
             return this;
         }
 
@@ -136,6 +146,7 @@ public final class HttpRequest {
                         uri.getPath(),
                         uri.getQuery(),
                         null);
+                this.humanFriendlyUri = uri;
             } else {
                 this.uri = uri;
             }

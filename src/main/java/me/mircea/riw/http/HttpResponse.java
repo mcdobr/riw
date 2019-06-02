@@ -9,6 +9,7 @@ import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.zip.GZIPInputStream;
 
 public final class HttpResponse {
     private static final int MAX_REDIRECTS;
@@ -61,11 +62,12 @@ public final class HttpResponse {
         BufferedReader br = new BufferedReader(new InputStreamReader(is));
         String statusLine = br.readLine();
 
-        Scanner scanner = new Scanner(statusLine);
-        String versionStr = scanner.next();
-        builder.version(HttpVersion.fromString(versionStr))
-                .status(scanner.nextInt())
-                .reasonPhrase(scanner.nextLine().trim());
+        try (Scanner statusLineScanner = new Scanner(statusLine)) {
+            String versionStr = statusLineScanner.next();
+            builder.version(HttpVersion.fromString(versionStr))
+                    .status(statusLineScanner.nextInt())
+                    .reasonPhrase(statusLineScanner.nextLine().trim());
+        }
 
         String header;
         while (!(header = br.readLine().trim()).isEmpty()) {
@@ -73,10 +75,30 @@ public final class HttpResponse {
             builder.addHeader(headerParts[0], headerParts[1]);
         }
 
+        String transferEncoding = builder.headers.getOrDefault("Transfer-Encoding", "identity");
+
         String bodyLine;
-        while ((bodyLine = br.readLine()) != null) {
-            builder.bodyBuilder.append(bodyLine).append(System.lineSeparator());
+        switch (transferEncoding.toLowerCase()) {
+            case "identity":
+                while ((bodyLine = br.readLine()) != null) {
+                    builder.bodyBuilder.append(bodyLine).append(System.lineSeparator());
+                }
+                break;
+            case "chunked":
+                while ((bodyLine = br.readLine()) != null) {
+                    if (bodyLine.matches("[0-9]+")) {
+                    } else {
+                        builder.bodyBuilder.append(bodyLine).append(System.lineSeparator());
+                    }
+                }
+                break;
+            default:
+                //throw new UnsupportedOperationException("deflate, gzip and compress not supported!");
+                break;
         }
+
+
+
 
         return builder.build();
     }

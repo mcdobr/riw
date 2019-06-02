@@ -1,5 +1,8 @@
 package me.mircea.riw.dns;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 public class DnsRecord {
     private final String name;
     private final DnsRecordType type;
@@ -45,5 +48,24 @@ public class DnsRecord {
         sb.append(", data='").append(data).append('\'');
         sb.append('}');
         return sb.toString();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        DnsRecord record = (DnsRecord) o;
+        return name.equals(record.name) &&
+                type == record.type &&
+                clazz.equals(record.clazz) &&
+                ttl.equals(record.ttl) &&
+                Arrays.equals(data, record.data);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(name, type, clazz, ttl);
+        result = 31 * result + Arrays.hashCode(data);
+        return result;
     }
 }

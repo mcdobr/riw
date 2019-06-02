@@ -1,5 +1,6 @@
 package me.mircea.riw.dns;
 
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,7 +16,6 @@ public class DnsClient {
 
     static {
         DNS_CACHE = new DnsCache();
-
     }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DnsClient.class);
@@ -70,23 +70,42 @@ public class DnsClient {
         this.rng = new Random();
     }
 
-
+    /**
+     * Returns an ip address for a host (will check cache first).
+     * @param host
+     * @return
+     */
     public InetAddress recursiveLookup(String host) {
-        InetAddress result = null;
+        InetAddress ipAddress = null;
 
-        try {
-            sendRequest(host, true);
-            DatagramPacket responsePacket = getResponsePacket();
-            result = parseSimpleLookupResponse(responsePacket);
-        } catch (SocketTimeoutException e) {
-            LOGGER.warn("Could not receive datagram before timeout {}", e);
-        } catch (IOException e) {
-            LOGGER.warn("An I/O error occured {}", e);
+        DnsRecord cachedAddressRecord = DNS_CACHE.getAddressRecordFor(host);
+        if (cachedAddressRecord != null) {
+            try {
+                ipAddress = InetAddress.getByAddress(cachedAddressRecord.getData());
+            } catch (UnknownHostException e) {
+                LOGGER.trace("Unknown host on cached entry {}", e);
+            }
+        } else {
+            try {
+                sendRequest(host, true);
+                DatagramPacket responsePacket = getResponsePacket();
+                ipAddress = parseSimpleLookupResponse(host, responsePacket);
+            } catch (SocketTimeoutException e) {
+                LOGGER.warn("Could not receive datagram before timeout {}", e);
+            } catch (IOException e) {
+                LOGGER.warn("An I/O error occured on DNS lookup {}", e);
+            }
         }
-
-        return result;
+        return ipAddress;
     }
 
+    /**
+     * Creates a dns message with only a simple question.
+     * @deprecated
+     * @param host
+     * @param recursive
+     * @throws IOException
+     */
     private void sendRequest(String host, boolean recursive) throws IOException {
         byte[] request = new byte[DNS_HEADER_LENGTH + host.length() + 2 + DNS_QTYPE_LENGTH + DNS_QCLASS_LENGTH];
 
@@ -143,20 +162,34 @@ public class DnsClient {
         return responsePacket;
     }
 
-    private InetAddress parseSimpleLookupResponse(DatagramPacket responsePacket) throws UnknownHostException, UnsupportedEncodingException {
-        InetAddress result = null;
 
-        byte[] response = responsePacket.getData();
-        DnsMessage msg = DnsMessage.newBuilder().readFrom(response).build();
+    /**
+     * Creates a DNS message from a datagram and caches answer results.
+     * @param host
+     * @param responsePacket
+     * @return
+     * @throws UnknownHostException
+     */
+    private InetAddress parseSimpleLookupResponse(String host, DatagramPacket responsePacket) throws UnknownHostException {
+        byte[] responseBytes = responsePacket.getData();
+        DnsMessage msg = DnsMessage.newBuilder().readFrom(responseBytes).build();
+        msg.getAnswerRecords().forEach(DNS_CACHE::add);
 
-
-        for (DnsRecord record : msg.getAnswerRecords()) {
-            if (record.getType().equals(DnsRecordType.A)) {
-                result = InetAddress.getByAddress(record.getData());
-            }
+        DnsRecord addressRecord = getAddressRecord(host, msg.getAnswerRecords());
+        if (addressRecord != null) {
+            return getAddressFromDnsRecord(addressRecord);
+        } else {
+            return null;
         }
+    }
 
-        return result;
+    private DnsRecord getAddressRecord(String host, Collection<DnsRecord> records) throws UnknownHostException {
+        return records.stream().filter(dnsRecord -> dnsRecord.getType() == DnsRecordType.A && dnsRecord.getName().equals(host)).findFirst().orElse(null);
+    }
+
+    private InetAddress getAddressFromDnsRecord(DnsRecord record) throws UnknownHostException {
+        Preconditions.checkArgument(record.getType() == DnsRecordType.A);
+        return InetAddress.getByAddress(record.getData());
     }
 
 }

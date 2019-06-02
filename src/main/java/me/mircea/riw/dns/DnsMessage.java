@@ -10,7 +10,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class DnsMessage {
-    private static final Logger LOGGER = LoggerFactory.getLogger(DnsClient.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(
+            DnsClient.class);
 
     private static final int DNS_PORT = 53;
     private static final int DNS_HEADER_LENGTH = 12;

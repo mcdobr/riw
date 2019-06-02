@@ -1,5 +1,6 @@
 package me.mircea.riw.crawler;
 
+import crawlercommons.robots.BaseRobotRules;
 import me.mircea.riw.dns.DnsClient;
 import me.mircea.riw.http.HttpClient;
 import me.mircea.riw.http.HttpRequest;
@@ -20,14 +21,29 @@ import java.net.UnknownHostException;
 import java.nio.file.*;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+import java.util.concurrent.*;
 
 public class Fetcher {
-    private static final Logger LOGGER = LoggerFactory.getLogger(Fetcher.class);
-    //private static final String USER_AGENT = "Mozilla/5.0 (compatible; dmcBot/1.0)";
-    private static final String USER_AGENT = "RIWEB_CRAWLER";
+    private static final Logger LOGGER;
+    private static final String USER_AGENT;
+    private static final ExecutorService PARSER_THREADS;
+    private static final Map<String, String> ESCAPE_SEQUENCES = new HashMap<>();
+
+    static {
+        LOGGER = LoggerFactory.getLogger(Fetcher.class);
+        USER_AGENT = "RIWEB_CRAWLER";
+        PARSER_THREADS = Executors.newFixedThreadPool(4);
+
+        ESCAPE_SEQUENCES.put("\"", "%22");
+        ESCAPE_SEQUENCES.put("<", "%3C");
+        ESCAPE_SEQUENCES.put(">", "%3E");
+        ESCAPE_SEQUENCES.put("*", "%2A");
+        ESCAPE_SEQUENCES.put("/", "%2F");
+        ESCAPE_SEQUENCES.put(":", "%3A");
+        ESCAPE_SEQUENCES.put("?", "%3F");
+        ESCAPE_SEQUENCES.put("\\", "%5C");
+        ESCAPE_SEQUENCES.put("|", "%7C");
+    }
 
 
     private final CrawlController controller;
@@ -35,14 +51,16 @@ public class Fetcher {
     private final HttpClient httpClient;
     private final String targetHost;
     private final BlockingQueue<URI> downloadQueue;
+    private final BaseRobotRules rules;
 
 
-    public Fetcher(CrawlController controller, URI seed) throws SocketException, UnknownHostException {
+    public Fetcher(CrawlController controller, URI seed, BaseRobotRules rules) throws SocketException, UnknownHostException {
         this.controller = controller;
         this.dnsClient = new DnsClient("8.8.8.8");
         this.httpClient = new HttpClient();
         this.targetHost = seed.getHost();
         this.downloadQueue = new ActiveDownloadQueue<>();
+        this.rules = rules;
     }
 
     public String getTargetHost() {
@@ -66,7 +84,7 @@ public class Fetcher {
     private URI tryToGetUri() {
         URI uri = null;
         try {
-            uri = downloadQueue.poll(1, TimeUnit.MINUTES);
+            uri = downloadQueue.poll(15, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             LOGGER.error("Fetcher thread was interrupted {}", e);
@@ -85,42 +103,56 @@ public class Fetcher {
     }
 
     private void downloadAndFollowLinks(URI uri) throws URISyntaxException, IOException {
-        HttpRequest getRequest = HttpRequest.newBuilder()
-                .withDnsClient(this.dnsClient)
-                .get()
-                .uri(uri)
-                .addHeader("Host", uri.getHost())
-                .addHeader("User-Agent", USER_AGENT)
-                .addHeader("Connection", "close")
-                .build();
+        final int MAX_TRIES = 3;
 
-        HttpResponse response = httpClient.send(getRequest);
-        handleResponse(uri, response);
-    }
+        boolean shouldTry = true;
+        for (int noTry = 0; shouldTry && noTry < MAX_TRIES; ++noTry){
+            HttpRequest getRequest = HttpRequest.newBuilder()
+                    .withDnsClient(this.dnsClient)
+                    .get()
+                    .uri(uri)
+                    .addHeader("Host", uri.getHost())
+                    .addHeader("User-Agent", USER_AGENT)
+                    .addHeader("Connection", "close")
+                    .build();
 
-    private void handleResponse(URI uri, HttpResponse response) {
-        if (response.status() == 200) {
-            parseSuccessfulResponse(uri, response);
-        } else if (response.status() == 301) {
-            // TODO: handle permanent redirect
-        } else if (response.status() % 100 == 3){
-            // TODO: handle other
-        } else {
-            LOGGER.warn("Got status {} on URI {}", response.status(), uri);
+            HttpResponse response = httpClient.send(getRequest);
+
+            shouldTry = handleResponse(uri, response);
         }
     }
 
+    /**
+     * @param uri
+     * @param response is modified for a redirect if needed
+     * @return
+     */
+    private boolean handleResponse(URI uri, HttpResponse response) {
+        if (response.status() == 200) {
+            PARSER_THREADS.execute(() -> parseSuccessfulResponse(uri, response));
+            return false;
+        } else if (response.status() == 301) {
+            // TODO: handle permanent redirect
+            return true;
+        } else if (response.status() % 100 == 3){
+            // TODO: handle other
+            return true;
+        } else {
+            LOGGER.warn("Got status {} on URI {}", response.status(), uri);
+            return false;
+        }
+    }
 
     private void parseSuccessfulResponse(URI uri, HttpResponse response) {
-        LOGGER.info("Downloading document at URI {} at {}", uri, Instant.now());
+        LOGGER.info("Parsing document at URI {} at {}", uri, Instant.now());
 
         Document htmlDoc = Jsoup.parse(response.getBody(), uri.toString());
         Elements links = htmlDoc.select("a[href]");
 
         Element metaRobotsTag = htmlDoc.selectFirst("meta[name='robots']");
-        Set<String> instructions = Collections.emptySet();
+        Set<String> instructions = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         if (metaRobotsTag != null) {
-            instructions = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+
 
             String metaRobotsTagContent = metaRobotsTag.attr("content");
             for (String str : metaRobotsTagContent.split(",")) {
@@ -128,14 +160,12 @@ public class Fetcher {
             }
         }
 
-        if (shouldIndex(instructions)) {
-            saveDocument(uri, htmlDoc);
-            LOGGER.info("Saved document at URI {}", uri);
-        }
-
         if (shouldFollowLinks(instructions)) {
             followLinks(uri, links);
-            LOGGER.info("Following links from document at URI {}", uri);
+        }
+
+        if (shouldIndex(instructions)) {
+            saveDocument(uri, htmlDoc);
         }
     }
 
@@ -155,48 +185,20 @@ public class Fetcher {
                     URI href = new URI(str);
                     href = new URI(href.getScheme(), href.getHost(), href.getPath(), href.getQuery(), null);
 
-                    if (isWorthFollowing(uri, href)) {
+                    if (isWorthFollowingLocally(href)) {
+                        this.downloadQueue.add(href);
+                    } else {
                         this.controller.add(href);
                     }
                 }
             } catch (URISyntaxException e) {
-                LOGGER.info("Reconstructed URI was malformed {}", e);
+                //LOGGER.info("Reconstructed URI was malformed {}", e);
             }
         }
     }
 
-    private boolean isWorthFollowing(URI src, URI dest) {
-        return !isTheSameResource(src, dest) && !hasBeenVisited(dest);
-
-    }
-
-    private boolean isTheSameResource(URI src, URI dest) {
-        boolean areEqual = true;
-        if (src.getScheme() != null && dest.getScheme() != null) {
-            areEqual &= src.getScheme().equals(dest.getScheme());
-        } else {
-            return false;
-        }
-
-        if (src.getHost() != null && dest.getHost() != null) {
-            areEqual &= src.getHost().equals(dest.getHost());
-        } else {
-            return false;
-        }
-
-        if (src.getPath() != null && dest.getPath() != null) {
-            areEqual &= src.getPath().equals(dest.getPath());
-        } else if ((src.getPath() == null) != (dest.getPath() == null)) {
-            return false;
-        }
-
-        if (src.getQuery() != null && dest.getQuery() != null) {
-            areEqual &= src.getQuery().equals(dest.getQuery());
-        } else if ((src.getQuery() == null) != (dest.getQuery() == null)) {
-            return false;
-        }
-
-        return areEqual;
+    private boolean isWorthFollowingLocally(URI next) {
+        return rules.isAllowed(next.toString()) && !hasBeenVisited(next) && next.getHost().equals(this.targetHost);
     }
 
     private void saveDocument(URI uri, org.jsoup.nodes.Document jsoupDoc) {
@@ -207,6 +209,8 @@ public class Fetcher {
             Files.createDirectories(fileSystemTranslatedPath.getParent());
             bw = Files.newBufferedWriter(fileSystemTranslatedPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
             bw.write(jsoupDoc.html());
+        } catch (FileAlreadyExistsException e) {
+            LOGGER.warn("Ignoring and not overwriting an existing file {}", fileSystemTranslatedPath);
         } catch (IOException e) {
             LOGGER.warn("An I/O exception occured when trying to save the files on URI {}: {}", uri, e);
         } finally {
@@ -228,12 +232,34 @@ public class Fetcher {
     private Path translateToPath(URI uri) {
         uri = uri.normalize();
 
-        Path pathOfUri = Paths.get(controller.getDestination().toString(), uri.getHost(), uri.getPath());
+        String host = uri.getHost();
+        String path = uri.getPath();
+        String query = uri.getQuery();
+
+        if (host != null) {
+            host = escapeUriCharacters(host);
+        }
+
+        if (path != null) {
+            path = escapeUriCharacters(path);
+        }
+
+        if (query != null) {
+            query = escapeUriCharacters(path);
+        }
+
+        // Construct path path
+        Path pathOfUri = Paths.get(controller.getDestination().toString(), host);
+        if (path != null) {
+            pathOfUri = Paths.get(pathOfUri.toString(), path);
+        }
+
         if (isMissingIndex(uri)) {
             pathOfUri = Paths.get(pathOfUri.toString(), "index.html");
         }
-        if (uri.getQuery() != null) {
-            pathOfUri = Paths.get(pathOfUri.toString(), uri.getQuery());
+
+        if (query != null) {
+            pathOfUri = Paths.get(pathOfUri.toString(), query);
         }
 
         if (isMissingExtension((pathOfUri))) {
@@ -241,6 +267,21 @@ public class Fetcher {
         }
 
         return pathOfUri;
+    }
+
+    private String escapeUriCharacters(String str) {
+        StringBuilder builder = new StringBuilder();
+
+        for (int i = 0; i < str.length(); ++i) {
+            char c = str.charAt(i);
+            if (ESCAPE_SEQUENCES.containsKey(c)) {
+                builder.append(ESCAPE_SEQUENCES.get(c));
+            } else {
+                builder.append(c);
+            }
+        }
+
+        return builder.toString();
     }
 
     private boolean isMissingIndex(URI uri) {
@@ -257,5 +298,9 @@ public class Fetcher {
     private boolean isMissingExtension(Path path) {
         String extension = com.google.common.io.Files.getFileExtension(path.toString());
         return extension.isEmpty();
+    }
+
+    public BaseRobotRules getRules() {
+        return rules;
     }
 }

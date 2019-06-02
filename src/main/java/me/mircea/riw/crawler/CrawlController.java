@@ -21,13 +21,14 @@ import java.util.concurrent.*;
 
 public class CrawlController {
     private static final Logger LOGGER = LoggerFactory.getLogger(CrawlController.class);
-    //private static final String BOT_NAME = "dmcBot";
-    private static final String BOT_NAME = "RIWEB_CRAWLER";
+    //private static final String USER_AGENT = "Mozilla/5.0 (compatible; dmcBot/1.0)";
+    private static final String USER_AGENT = "RIWEB_CRAWLER";
     private static final long DEFAULT_CRAWL_DELAY = 1000;
 
 
     private final BlockingQueue<URI> activeQueue;
     private final ScheduledExecutorService scheduler;
+
     private final Map<String, BaseRobotRules> hostRobotRules;
     private final Map<String, Fetcher> hostFetchers;
     private final Map<Fetcher, ScheduledFuture<?>> fetcherTasks;
@@ -36,6 +37,7 @@ public class CrawlController {
     public CrawlController(int noThreads, Path destination) {
         this.activeQueue = new ActiveDownloadQueue<>();
         this.scheduler = Executors.newScheduledThreadPool(noThreads);
+
         this.hostRobotRules = new HashMap<>();
         this.hostFetchers = new HashMap<>();
         this.fetcherTasks = new HashMap<>();
@@ -66,36 +68,56 @@ public class CrawlController {
         hostFetchers.remove(fetcher.getTargetHost(), fetcher);
     }
 
-    public void crawl() {
+    public void crawl() throws InterruptedException {
         while (true) {
-            URI uri = activeQueue.poll();
+            URI uri = activeQueue.poll(1, TimeUnit.MINUTES);
 
             if (uri != null) {
-                BaseRobotRules relevantRules = getHostRobotRulesFrom(uri);
-                if (relevantRules.isAllowed(uri.toString())) {
-                    try {
-                        Fetcher hostFetcher = getHostFetcherFor(uri);
-                        hostFetcher.add(uri);
-                    } catch (SocketException | UnknownHostException e) {
-                        LOGGER.warn("Could not initialize fetcher for domain of uri {}");
+                Optional<Fetcher> hostFetcher = getHostFetcherFor(uri);
+                if (hostFetcher.isPresent()) {
+                    Fetcher fetcher = hostFetcher.get();
+                    if (fetcher.getRules().isAllowed(uri.toString())) {
+                        hostFetcher.get().add(uri);
                     }
                 }
             }
         }
     }
+    /**
+     * @brief Upsert a new fetcher if possible
+     */
+    private Optional<Fetcher> getHostFetcherFor(URI uri) {
+        if (hostFetchers.containsKey(uri.getHost())) {
+            return Optional.of(hostFetchers.get(uri.getHost()));
+        } else {
+            Fetcher hostFetcher = null;
+            try {
+                hostFetcher = new Fetcher(this, uri, getHostRobotRulesFrom(uri));
+                hostFetchers.put(uri.getHost(), hostFetcher);
 
-    public boolean isNewDomain(URI uri) {
-        return uri != null && !hostFetchers.containsKey(uri.getHost());
+                ScheduledFuture<?> future = scheduler.scheduleAtFixedRate(new FetcherTask(hostFetcher),
+                        0,
+                        hostFetcher.getRules().getCrawlDelay(),
+                        TimeUnit.MILLISECONDS);
+
+                fetcherTasks.put(hostFetcher, future);
+            } catch (SocketException | UnknownHostException e) {
+                LOGGER.info("Could not establish connection to seed {}", uri);
+            }
+
+            return Optional.ofNullable(hostFetcher);
+        }
     }
 
     /**
-     * @brief Get (and insert if needed) the robots ruled associated with host
+     * @brief Upsert new robot rules (get default with no disallow and 1 sec crawl delay)
      */
     private BaseRobotRules getHostRobotRulesFrom(URI uri) {
         if (hostRobotRules.containsKey(uri.getHost())) {
             return hostRobotRules.get(uri.getHost());
         } else {
             BaseRobotRules rules = new SimpleRobotRules();
+
             try {
                 URI robotsTxtURI = new URI(uri.getScheme(), uri.getHost(), "/robots.txt", null);
                 BaseRobotsParser robotsParser = new SimpleRobotRulesParser();
@@ -105,7 +127,7 @@ public class CrawlController {
                         .get()
                         .uri(robotsTxtURI)
                         .addHeader("Host", robotsTxtURI.getHost())
-                        .addHeader("User-Agent", "Mozilla/5.0 (compatible; dmcBot/1.0)")
+                        .addHeader("User-Agent", USER_AGENT)
                         .addHeader("Connection", "close")
                         .build();
 
@@ -115,14 +137,12 @@ public class CrawlController {
                     rules = robotsParser.parseContent(robotsTxtURI.toString(),
                             repResponse.getBody().getBytes(),
                             "text/plain",
-                            BOT_NAME);
+                            USER_AGENT);
+                } else {
+                    LOGGER.info("Got status {} on robots.txt file at URI {}", repResponse.status(), robotsTxtURI);
                 }
-            } catch (URISyntaxException e) {
-                LOGGER.warn("Could not find robots.txt file on domain {}. Exception {}", uri.getHost(), e);
-            } catch (UnknownHostException e) {
-                LOGGER.warn("Could not reach the host {}, Exception {}", uri.getHost(), e);
-            } catch (IOException e) {
-                LOGGER.warn("An I/O error occured {}", e);
+            } catch (URISyntaxException | IOException e) {
+                LOGGER.warn("Exception occured while trying to get robots.txt on {}", uri.getHost());
             }
 
             if (rules.getCrawlDelay() == BaseRobotRules.UNSET_CRAWL_DELAY) {
@@ -130,28 +150,6 @@ public class CrawlController {
             }
 
             return rules;
-        }
-    }
-
-    /**
-     * @brief Get the fetcher or create one
-     */
-    private Fetcher getHostFetcherFor(URI uri) throws SocketException, UnknownHostException {
-        if (hostFetchers.containsKey(uri.getHost())) {
-            return hostFetchers.get(uri.getHost());
-        } else {
-            Fetcher hostFetcher = new Fetcher(this, uri);
-            hostFetchers.put(uri.getHost(), hostFetcher);
-
-            BaseRobotRules hostRobotRules = getHostRobotRulesFrom(uri);
-            ScheduledFuture<?> future = scheduler.scheduleAtFixedRate(new FetcherTask(hostFetcher),
-                    0,
-                    hostRobotRules.getCrawlDelay(),
-                    TimeUnit.MILLISECONDS);
-
-            fetcherTasks.put(hostFetcher, future);
-
-            return hostFetcher;
         }
     }
 }
